@@ -15,9 +15,6 @@ import {TokenUtils} from "./libraries/TokenUtils.sol";
 import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from "./base/Errors.sol";
 import "./base/TransmuterErrors.sol";
 
-
-import {console} from "forge-std/console.sol";
-
 /// @title AlchemixV3 Transmuter
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
@@ -38,9 +35,6 @@ contract Transmuter is ITransmuter, ERC721 {
 
     /// @inheritdoc ITransmuter
     uint256 public exitFee;
-
-    /// @inheritdoc ITransmuter
-    uint256 public graphSize;
 
     /// @inheritdoc ITransmuter
     uint256 public transmutationFee;
@@ -90,7 +84,6 @@ contract Transmuter is ITransmuter, ERC721 {
         exitFee = params.exitFee;
         protocolFeeReceiver = params.feeReceiver;
         admin = msg.sender;
-        graphSize = params.graphSize;
     }
 
     /// @inheritdoc ITransmuter
@@ -272,7 +265,6 @@ contract Transmuter is ITransmuter, ERC721 {
 
     /// @inheritdoc ITransmuter
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
-        console.log(_stakingGraph.size);
         int256 queried = _stakingGraph.queryStake(startBlock, endBlock);
 
         if (queried == 0) return 0;

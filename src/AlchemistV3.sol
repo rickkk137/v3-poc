@@ -18,7 +18,7 @@ import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20
 import {IPriceFeedAdapter} from "./adapters/ETHUSDPriceFeedAdapter.sol";
 import {IAlchemistTokenVault} from "./interfaces/IAlchemistTokenVault.sol";
 
-import {console} from "forge-std/console.sol";
+import {console2} from "forge-std/console2.sol";
 
 /// @title  AlchemistV3
 /// @author Alchemix Finance
@@ -600,6 +600,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // This underpricing leads to the transmuter requesting more tokens than the alchemist has earmarked in some cases
         _redemptionWeight += PositionDecay.WeightIncrement(amount > cumulativeEarmarked ? cumulativeEarmarked : amount, cumulativeEarmarked);
 
+        console2.log(_redemptionWeight);
+
         // Calculate current fee price
         uint256 collRedeemed = convertDebtTokensToYield(amount);
         uint256 feeCollateral = collRedeemed * protocolFee / BPS;
@@ -1173,6 +1175,17 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 redeemed = (earmarkOld + deltaRaw >= earmarkNow)
             ? (earmarkOld + deltaRaw - earmarkNow)
             : 0;
+
+        console2.log(_redemptionWeight);
+        console2.logUint(uint(survivalOld));
+        console2.logUint(uint(survivalNew));
+        console2.logUint(uint(exposure));
+        console2.logUint(uint(deltaRaw));
+        console2.logUint(uint(deltaA));
+        console2.logUint(uint(accumulatorOld));
+        console2.logUint(uint(accumulatorNew));
+        console2.logUint(uint(earmarkNow));
+        console2.logUint(uint(redeemed));
 
         return (
             account.debt >= redeemed ? account.debt - redeemed : 0,
