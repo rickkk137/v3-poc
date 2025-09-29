@@ -70,12 +70,12 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         params = _params;
         adapterId = keccak256(abi.encode(_params.protocol, address(this)));
         
-        // Initialize Permit2 configuration
+
         permit2Address = _permit2Address;
         
-        // Approve Permit2 for both the vault's asset token and the receipt token
-        IERC20 vaultAsset = IERC20(address(MYT.asset()));
-        vaultAsset.approve(permit2Address, type(uint256).max);
+
+        // IERC20 vaultAsset = IERC20(address(MYT.asset()));
+        // vaultAsset.approve(permit2Address, type(uint256).max);
         IERC20 receiptTokenContract = IERC20(receiptToken);
         receiptTokenContract.approve(permit2Address, type(uint256).max);
         
@@ -246,13 +246,13 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         require(newAddress != address(0), "Zero address");
         
         // Revoke old approvals
-        IERC20 vaultAsset = IERC20(address(MYT.asset()));
-        vaultAsset.approve(permit2Address, 0);
+        // IERC20 vaultAsset = IERC20(address(MYT.asset()));
+        // vaultAsset.approve(permit2Address, 0);
         IERC20 receiptTokenContract = IERC20(receiptToken);
         receiptTokenContract.approve(permit2Address, 0);
         
         // Set new approvals
-        vaultAsset.approve(newAddress, type(uint256).max);
+        //vaultAsset.approve(newAddress, type(uint256).max);
         receiptTokenContract.approve(newAddress, type(uint256).max);
         permit2Address = newAddress;
     }
