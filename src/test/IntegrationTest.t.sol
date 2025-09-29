@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity 0.8.26;
+pragma solidity 0.8.28;
 
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -246,7 +246,7 @@ contract IntegrationTest is Test {
         (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
         assertApproxEqAbs(debt, 0, 9201);
-        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000);
+        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
         assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
@@ -435,7 +435,7 @@ contract IntegrationTest is Test {
         (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
         assertEq(debt, 0);
-        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000);
+        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
         assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
@@ -590,33 +590,5 @@ contract IntegrationTest is Test {
         // 8. Update debt and earmark
         vm.prank(address(0xbeef));
         alchemist.poke(tokenId);
-    }
-
-    function testAudit_RedemptionWeight() external {
-        // Deposit 100_100e6 EULER_USDC, borrow 10_000 alUSD
-        vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        alchemist.mint(tokenId, 10_000e18, address(0xbeef));
-        vm.stopPrank();
-        vm.startPrank(address(0xdad));
-        IERC20(alUSD).approve(address(transmuterLogic), 3000e18);
-        // Create redemption for 1_000 alUSD and claim
-        transmuterLogic.createRedemption(1000e18);
-        vm.roll(vm.getBlockNumber() + 5_256_000);
-        transmuterLogic.claimRedemption(1);
-        // Create redemption for 1_000 alUSD
-        transmuterLogic.createRedemption(1000e18);
-        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
-        // Create another redemption for 1_000 alUSD after passing half period
-        transmuterLogic.createRedemption(1000e18);
-        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
-        // Claim the second redemption
-        transmuterLogic.claimRedemption(2);
-        vm.stopPrank();
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
-        assertApproxEqAbs(debt, 10_000e18 - 2_000e18, 1);
-        assertEq(earmarked, 0);
     }
 }

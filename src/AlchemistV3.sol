@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.28;
 
 import "./interfaces/IAlchemistV3.sol";
 import {ITokenAdapter} from "./interfaces/ITokenAdapter.sol";
@@ -15,7 +15,6 @@ import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./base/Errors.sol";
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {IPriceFeedAdapter} from "./adapters/ETHUSDPriceFeedAdapter.sol";
 import {IAlchemistTokenVault} from "./interfaces/IAlchemistTokenVault.sol";
 
 import {console2} from "forge-std/console2.sol";
@@ -403,7 +402,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         _sync(tokenId);
 
-        uint256 lockedCollateral = convertDebtTokensToYield( _accounts[tokenId].debt) * minimumCollateralization / FIXED_POINT_SCALAR;
+        uint256 lockedCollateral = convertDebtTokensToYield(_accounts[tokenId].debt) * minimumCollateralization / FIXED_POINT_SCALAR;
         _checkArgument(_accounts[tokenId].collateralBalance - lockedCollateral >= amount);
 
         _accounts[tokenId].collateralBalance -= amount;
@@ -489,7 +488,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _accounts[recipientId].collateralBalance -= convertDebtTokensToYield(credit) * protocolFee / BPS;
         TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, convertDebtTokensToYield(credit) * protocolFee / BPS);
         _yieldTokensDeposited -= convertDebtTokensToYield(credit) * protocolFee / BPS;
-        
+
         // Update the recipient's debt.
         _subDebt(recipientId, credit);
 
@@ -527,7 +526,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Repay debt from earmarked amount of debt first
         uint256 earmarkToRemove = credit > account.earmarked ? account.earmarked : credit; // DEBT units
         _decreaseEarmark(account, earmarkToRemove);
-        
+
         uint256 earmarkPaidGlobal = cumulativeEarmarked > earmarkToRemove ? earmarkToRemove : cumulativeEarmarked;
         cumulativeEarmarked -= earmarkPaidGlobal;
 
@@ -747,7 +746,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 credit = amount > debt ? debt : amount;
         uint256 creditToYield = convertDebtTokensToYield(credit);
         _subDebt(accountId, credit);
-        
+
         // Repay debt from earmarked amount of debt first
         uint256 earmarkToRemove = credit > account.earmarked ? account.earmarked : credit;
         _decreaseEarmark(account, earmarkToRemove);
@@ -1035,9 +1034,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 earmarkOld = (accumulatorOld * survivalOld) >> 128;
         uint256 accumulatorNew = accumulatorOld + deltaA;
         uint256 earmarkNow = (accumulatorNew * survivalNew) >> 128;
-        uint256 redeemed = (earmarkOld + deltaRaw >= earmarkNow)
-            ? (earmarkOld + deltaRaw - earmarkNow)
-            : 0;
+        uint256 redeemed = (earmarkOld + deltaRaw >= earmarkNow) ? (earmarkOld + deltaRaw - earmarkNow) : 0;
 
         // Update account state
         account.accumulator = accumulatorNew;
@@ -1048,9 +1045,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Update last account weights
         account.lastCollateralWeight = _collateralWeight;
-        account.lastAccruedEarmarkWeight            = _earmarkWeight;
-        account.lastAccruedNormalizedEarmarkWeight  = _normalizedEarmarkWeight;
-        account.lastAccruedRedemptionWeight         = _redemptionWeight;
+        account.lastAccruedEarmarkWeight = _earmarkWeight;
+        account.lastAccruedNormalizedEarmarkWeight = _normalizedEarmarkWeight;
+        account.lastAccruedRedemptionWeight = _redemptionWeight;
     }
 
     /// @dev Earmarks the debt for redemption.
@@ -1060,9 +1057,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Yield the transmuter accumulated since last earmark (cover)
         uint256 transmuterCurrentBalance = TokenUtils.safeBalanceOf(yieldToken, address(transmuter));
-        uint256 transmuterDifference = transmuterCurrentBalance > lastTransmuterTokenBalance
-            ? transmuterCurrentBalance - lastTransmuterTokenBalance
-            : 0;
+        uint256 transmuterDifference = transmuterCurrentBalance > lastTransmuterTokenBalance ? transmuterCurrentBalance - lastTransmuterTokenBalance : 0;
 
         uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
 
@@ -1082,17 +1077,16 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
                 // If survival is very small deltaN may be larger than liveUnearmarked in rare cases so we clamp
                 if (deltaN > liveUnearmarked) deltaN = liveUnearmarked;
-                
+
                 _normalizedEarmarkWeight += PositionDecay.WeightIncrement(deltaN, liveUnearmarked);
             }
             cumulativeEarmarked += amount;
         }
 
-
         lastEarmarkBlock = block.number;
     }
 
-    // Decrease earmarked debt by `amountDebt` (in DEBT units) by 
+    // Decrease earmarked debt by `amountDebt` (in DEBT units) by
     // reducing the accumulator so that views/sync agree.
     function _decreaseEarmark(Account storage account, uint256 amountDebt) internal {
         if (amountDebt == 0) return;
@@ -1133,9 +1127,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (block.number > lastEarmarkBlock) {
             // Yield the transmuter accumulated since last earmark (cover)
             uint256 transmuterCurrentBalance = TokenUtils.safeBalanceOf(yieldToken, address(transmuter));
-            uint256 transmuterDifference = transmuterCurrentBalance > lastTransmuterTokenBalance
-                ? transmuterCurrentBalance - lastTransmuterTokenBalance
-                : 0;
+            uint256 transmuterDifference = transmuterCurrentBalance > lastTransmuterTokenBalance ? transmuterCurrentBalance - lastTransmuterTokenBalance : 0;
 
             uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
 
@@ -1155,7 +1147,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
                     // If survival is very small deltaN may be larger than liveUnearmarked in rare cases so we clamp
                     if (deltaN > liveUnearmarked) deltaN = liveUnearmarked;
-                    
+
                     normalizedEarmarkWeightCopy += PositionDecay.WeightIncrement(deltaN, liveUnearmarked);
                 }
             }
@@ -1172,26 +1164,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 earmarkOld = (accumulatorOld * survivalOld) >> 128;
         uint256 accumulatorNew = accumulatorOld + deltaA;
         uint256 earmarkNow = (accumulatorNew * survivalNew) >> 128;
-        uint256 redeemed = (earmarkOld + deltaRaw >= earmarkNow)
-            ? (earmarkOld + deltaRaw - earmarkNow)
-            : 0;
+        uint256 redeemed = (earmarkOld + deltaRaw >= earmarkNow) ? (earmarkOld + deltaRaw - earmarkNow) : 0;
 
-        console2.log(_redemptionWeight);
-        console2.logUint(uint(survivalOld));
-        console2.logUint(uint(survivalNew));
-        console2.logUint(uint(exposure));
-        console2.logUint(uint(deltaRaw));
-        console2.logUint(uint(deltaA));
-        console2.logUint(uint(accumulatorOld));
-        console2.logUint(uint(accumulatorNew));
-        console2.logUint(uint(earmarkNow));
-        console2.logUint(uint(redeemed));
-
-        return (
-            account.debt >= redeemed ? account.debt - redeemed : 0,
-            earmarkNow,
-            account.collateralBalance - collateralToRemove
-        );
+        return (account.debt >= redeemed ? account.debt - redeemed : 0, earmarkNow, account.collateralBalance - collateralToRemove);
     }
 
     /// @dev Checks that the account owned by `tokenId` is properly collateralized.
