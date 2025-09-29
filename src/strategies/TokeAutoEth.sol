@@ -25,8 +25,8 @@ contract TokeAutoEthStrategy is MYTStrategy {
     RootOracle public immutable oracle;
     address public immutable rewardToken;
 
-    constructor(address _myt, StrategyParams memory _params, address _autoEth, address _router, address _rewarder, address _weth, address _oracle)
-        MYTStrategy(_myt, _params)
+    constructor(address _myt, StrategyParams memory _params, address _autoEth, address _router, address _rewarder, address _weth, address _oracle, address _permit2Address)
+        MYTStrategy(_myt, _params, _permit2Address, _autoEth)
     {
         autoEth = IERC4626(_autoEth);
         router = IAutopilotRouter(_router);
@@ -51,7 +51,6 @@ contract TokeAutoEthStrategy is MYTStrategy {
         withdrawReturn = autoEth.redeem(sharesToWithdraw, address(this), address(this));
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= withdrawReturn, "Strategy balance is less than amount");
         TokenUtils.safeApprove(address(weth), msg.sender, withdrawReturn);
-        TokenUtils.safeTransfer(address(weth), msg.sender, withdrawReturn);
     }
 
     function _claimRewards() internal override returns (uint256 rewardsClaimed) {

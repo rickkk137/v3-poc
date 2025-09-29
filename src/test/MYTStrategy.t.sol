@@ -159,8 +159,9 @@ contract MYTStrategyTest is Test {
         // Create vault (mock)
         vault = IVaultV2(address(new MockVault(IERC20(address(fakeUnderlyingToken)), IERC20(address(yieldToken)))));
 
-        // Create strategy
-        strategy = new MYTStrategy(address(vault), strategyParams);
+        // Create strategy with Permit2 address and receipt token
+        address permit2Address = 0x000000000022d473030f1dF7Fa9381e04776c7c5; // Mainnet Permit2
+        strategy = new MYTStrategy(address(vault), strategyParams, permit2Address, address(yieldToken));
 
         // Create allocator
         allocator = new AlchemistAllocator(address(vault), admin, operator);
@@ -169,38 +170,38 @@ contract MYTStrategyTest is Test {
         vm.prank(admin);
         strategy.setWhitelistedAllocator(address(allocator), true);
     }
-    /* 
+
     // Test that only whitelisted allocators can call allocate
     function test_onlyWhitelistedAllocatorCanAllocate() public {
         // Non-whitelisted address should fail
         vm.expectRevert(bytes("PD"));
-        strategy.allocate(100e18);
+        strategy.allocate(abi.encode(100e18), 100e18, bytes4(0x00000000), address(allocator));
 
         // Whitelisted allocator should succeed
         vm.prank(address(allocator));
-        strategy.allocate(100e18);
+        strategy.allocate(abi.encode(0), 100e18, bytes4(0x00000000), address(allocator));
     }
 
     // Test that only whitelisted allocators can call deallocate
     function test_onlyWhitelistedAllocatorCanDeallocate() public {
         // Non-whitelisted address should fail
         vm.expectRevert(bytes("PD"));
-        strategy.deallocate(100e18);
+        strategy.deallocate(abi.encode(100e18), 100e18, bytes4(0x00000000), address(allocator));
 
         // Whitelisted allocator should succeed
         vm.prank(address(allocator));
-        strategy.deallocate(50e18);
+        strategy.deallocate(abi.encode(100e18), 50e18, bytes4(0x00000000), address(allocator));
     }
 
     // Test that allocator can allocate and deallocate
     function test_allocatorCanAllocateAndDeallocate() public {
         // Allocator allocates
         vm.prank(address(allocator));
-        strategy.allocate(100e18);
+        strategy.allocate(abi.encode(0), 100e18, bytes4(0x00000000), address(allocator));
 
         // Allocator deallocates
         vm.prank(address(allocator));
-        strategy.deallocate(50e18);
+        strategy.deallocate(abi.encode(100e18), 50e18, bytes4(0x00000000), address(allocator));
     }
 
     // Test that strategy kill switch works
@@ -212,7 +213,7 @@ contract MYTStrategyTest is Test {
         // Allocator should fail to allocate
         vm.prank(address(allocator));
         vm.expectRevert(bytes("emergency"));
-        strategy.allocate(100e18);
+        strategy.allocate(abi.encode(0), 100e18, bytes4(0x00000000), address(allocator));
 
         // Disable kill switch
         vm.prank(admin);
@@ -220,7 +221,7 @@ contract MYTStrategyTest is Test {
 
         // Allocator should succeed
         vm.prank(address(allocator));
-        strategy.allocate(100e18);
+        strategy.allocate(abi.encode(0), 100e18, bytes4(0x00000000), address(allocator));
     }
 
     // Test that strategy parameters can be updated
@@ -234,7 +235,26 @@ contract MYTStrategyTest is Test {
         strategy.setAdditionalIncentives(true);
 
         // Verify updates
-        (, , , IMYTStrategy.RiskClass riskClass, , , , bool additionalIncentives) = strategy.params();
+        // Test that strategy parameters can be updated
+        vm.prank(admin);
+        strategy.setRiskClass(IMYTStrategy.RiskClass.HIGH);
+
+        // Update incentives
+        vm.prank(admin);
+        strategy.setAdditionalIncentives(true);
+
+        // Verify updates by reading from storage directly
+        // Access strategy parameters directly from storage
+        (
+            address owner,
+            string memory name,
+            string memory protocol,
+            IMYTStrategy.RiskClass riskClass,
+            uint256 cap,
+            uint256 globalCap,
+            uint256 estimatedYield,
+            bool additionalIncentives
+        ) = strategy.params();
         assertEq(uint8(riskClass), uint8(IMYTStrategy.RiskClass.HIGH));
         assertEq(additionalIncentives, true);
     }
@@ -278,7 +298,8 @@ contract MYTStrategyTest is Test {
         yieldToken.approve(address(alchemist), 100e18);
         alchemist.deposit(10e18, user, 0);
         vm.stopPrank();
-    } */
+    }
+
 }
 
 // Mock vault implementation

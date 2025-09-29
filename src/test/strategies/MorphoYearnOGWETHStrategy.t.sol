@@ -10,7 +10,7 @@ import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
 import {MorphoYearnOGWETHStrategy} from "../../strategies/MorphoYearnOGWETH.sol";
 
 contract MockMorphoYearnOGWETHStrategy is MorphoYearnOGWETHStrategy {
-    constructor(address _myt, StrategyParams memory _params, address _vault, address _weth) MorphoYearnOGWETHStrategy(_myt, _params, _vault, _weth) {}
+    constructor(address _myt, StrategyParams memory _params, address _vault, address _weth, address _permit2Address) MorphoYearnOGWETHStrategy(_myt, _params, _vault, _weth, _permit2Address) {}
 }
 
 contract MorphoYearnOGWETHStrategyTest is Test {
@@ -34,7 +34,8 @@ contract MorphoYearnOGWETHStrategyTest is Test {
             estimatedYield: 100 ether,
             additionalIncentives: false
         });
-        mytStrategy = new MockMorphoYearnOGWETHStrategy(address(vault), params, morphoYearnOGVault, WETH);
+        address permit2Address = 0x000000000022d473030f1dF7Fa9381e04776c7c5; // Mainnet Permit2
+        mytStrategy = new MockMorphoYearnOGWETHStrategy(address(vault), params, morphoYearnOGVault, WETH, permit2Address);
         vm.stopPrank();
     }
 

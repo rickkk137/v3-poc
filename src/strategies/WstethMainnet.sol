@@ -27,7 +27,7 @@ contract WstethMainnetStrategy is MYTStrategy {
     wstETH public immutable wsteth;
     unstETH public immutable unsteth;
 
-    constructor(address _myt, StrategyParams memory _params, address _stETH, address _wstETH, address _unstETH, address _referral) MYTStrategy(_myt, _params) {
+    constructor(address _myt, StrategyParams memory _params, address _stETH, address _wstETH, address _unstETH, address _referral, address _permit2Address) MYTStrategy(_myt, _params, _permit2Address, _stETH) {
         steth = stETH(_stETH);
         wsteth = wstETH(_wstETH);
         unsteth = unstETH(_unstETH);

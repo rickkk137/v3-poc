@@ -19,7 +19,7 @@ contract EETHMYTStrategy is MYTStrategy {
     EETH public immutable eeth;
     WETH public immutable weth;
 
-    constructor(address _myt, StrategyParams memory _params, address _eeth, address _weth) MYTStrategy(_myt, _params) {
+    constructor(address _myt, StrategyParams memory _params, address _eeth, address _weth, address _permit2Address) MYTStrategy(_myt, _params, _permit2Address, _eeth) {
         eeth = EETH(_eeth);
         weth = WETH(_weth);
     }

@@ -10,8 +10,8 @@ import {SfrxETHStrategy} from "../../strategies/SfrxETH.sol";
 import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
 
 contract MockSfrxETHStrategy is SfrxETHStrategy {
-    constructor(address _myt, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue)
-        SfrxETHStrategy(_myt, _params, _sfrxEth, _fraxMinter, _redemptionQueue)
+    constructor(address _myt, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue, address _permit2Address)
+        SfrxETHStrategy(_myt, _params, _sfrxEth, _fraxMinter, _redemptionQueue, _permit2Address)
     {}
 }
 
@@ -38,7 +38,8 @@ contract SfrxETHStrategyTest is Test {
             estimatedYield: 100 ether,
             additionalIncentives: false
         });
-        mytStrategy = new MockSfrxETHStrategy(address(vault), params, sfrxEth, fraxMinter, redemptionQueue);
+        address permit2Address = 0x000000000022d473030f1dF7Fa9381e04776c7c5; // Mainnet Permit2
+        mytStrategy = new MockSfrxETHStrategy(address(vault), params, sfrxEth, fraxMinter, redemptionQueue, permit2Address);
         vm.stopPrank();
     }
 

@@ -52,7 +52,8 @@ contract TokeAutoEthStrategyTest is Test {
             additionalIncentives: false
         });
 
-        strat = new TokeAutoEthStrategy(MYT, params, AUTOETH, ROUTER, REWARDER, WETH, ORACLE);
+        address permit2Address = 0x000000000022d473030f1dF7Fa9381e04776c7c5; // Mainnet Permit2
+        strat = new TokeAutoEthStrategy(MYT, params, AUTOETH, ROUTER, REWARDER, WETH, ORACLE, permit2Address);
 
         strat.setWhitelistedAllocator(address(0xbeef), true);
 

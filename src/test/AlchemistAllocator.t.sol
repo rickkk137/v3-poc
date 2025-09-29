@@ -119,11 +119,11 @@ contract AlchemistAllocatorTest is Test {
         vm.stopPrank();
     }
 
-    function _magicDepositToVault(address vault, address depositor, uint256 amount) internal {
+    function _magicDepositToVault(address _vault, address depositor, uint256 amount) internal {
         deal(address(mockVaultCollateral), address(depositor), amount);
         vm.startPrank(depositor);
-        TokenUtils.safeApprove(address(mockVaultCollateral), vault, amount);
-        IVaultV2(vault).deposit(amount, vault);
+        TokenUtils.safeApprove(address(mockVaultCollateral), address(vault), amount);
+        IVaultV2(address(vault)).deposit(amount, address(vault));
         vm.stopPrank();
     }
 

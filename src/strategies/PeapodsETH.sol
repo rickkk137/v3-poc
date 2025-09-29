@@ -16,7 +16,7 @@ contract PeapodsETHStrategy is MYTStrategy {
     IERC4626 public immutable peapodsEth;
     WETH public immutable weth;
 
-    constructor(address _myt, StrategyParams memory _params, address _peapodsEth, address _weth) MYTStrategy(_myt, _params) {
+    constructor(address _myt, StrategyParams memory _params, address _peapodsEth, address _weth, address _permit2Address) MYTStrategy(_myt, _params, _permit2Address, _peapodsEth) {
         peapodsEth = IERC4626(_peapodsEth);
         weth = WETH(_weth);
     }
@@ -31,7 +31,6 @@ contract PeapodsETHStrategy is MYTStrategy {
         withdrawReturn = peapodsEth.redeem(shares, address(this), address(this));
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= withdrawReturn, "Strategy balance is less than amount");
         TokenUtils.safeApprove(address(weth), msg.sender, withdrawReturn);
-        TokenUtils.safeTransfer(address(weth), msg.sender, withdrawReturn);
     }
 
     function _unwrapWETH(uint256 amount, address to) internal {

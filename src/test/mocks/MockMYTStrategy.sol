@@ -9,7 +9,7 @@ import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
 contract MockMYTStrategy is MYTStrategy {
     IMockYieldToken public immutable token;
 
-    constructor(address _myt, address _token, IMYTStrategy.StrategyParams memory _params) MYTStrategy(_myt, _params) {
+    constructor(address _myt, address _token, IMYTStrategy.StrategyParams memory _params, address _permit2Address) MYTStrategy(_myt, _params, _permit2Address, _token) {
         token = IMockYieldToken(_token);
     }
 

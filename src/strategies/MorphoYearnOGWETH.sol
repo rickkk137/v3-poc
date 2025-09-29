@@ -31,7 +31,7 @@ contract MorphoYearnOGWETHStrategy is MYTStrategy {
     WETH public immutable weth;
     IERC4626 public immutable vault;
 
-    constructor(address _myt, StrategyParams memory _params, address _vault, address _weth) MYTStrategy(_myt, _params) {
+    constructor(address _myt, StrategyParams memory _params, address _vault, address _weth, address _permit2Address) MYTStrategy(_myt, _params, _permit2Address, _weth) {
         weth = WETH(_weth);
         vault = IERC4626(_vault);
         require(vault.asset() == _weth, "Vault asset != WETH");
@@ -48,7 +48,6 @@ contract MorphoYearnOGWETHStrategy is MYTStrategy {
         withdrawReturn = vault.redeem(shares, address(this), address(this));
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= withdrawReturn, "Strategy balance is less than amount");
         TokenUtils.safeApprove(address(weth), msg.sender, withdrawReturn);
-        TokenUtils.safeTransfer(address(weth), msg.sender, withdrawReturn);
     }
 
     function _unwrapWETH(uint256 amount, address to) internal {

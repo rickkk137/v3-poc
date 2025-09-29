@@ -45,7 +45,8 @@ contract PeapodsETHStrategyTest is Test {
             additionalIncentives: false
         });
 
-        strat = new PeapodsETHStrategy(MYT, params, vaultAddr, WETH_ADDRESS);
+        address permit2Address = 0x000000000022d473030f1dF7Fa9381e04776c7c5; // Mainnet Permit2
+        strat = new PeapodsETHStrategy(MYT, params, vaultAddr, WETH_ADDRESS, permit2Address);
 
         strat.setWhitelistedAllocator(address(0xbeef), true);
 

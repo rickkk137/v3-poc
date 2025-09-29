@@ -20,12 +20,18 @@ interface IDeployerTiny is IERC721Tiny {
     function prev(uint128 featureId) external view returns (address);
 }
 
+// Interface for Permit2 to support ERC-1271 signature verification
+interface IPermit2 {
+    function isValidSignature(bytes32 hash, bytes memory signature) external view returns (bytes4);
+}
+
 contract MYTStrategy is IMYTStrategy, Ownable {
     IVaultV2 public immutable MYT;
+    address public immutable receiptToken;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
-    StrategyParams public params;
+    IMYTStrategy.StrategyParams public params;
     bytes32 public immutable adapterId;
     uint256 public lastSnapshotTime;
     uint256 public lastIndex;
@@ -38,6 +44,9 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     bool public killSwitch;
 
     mapping(address => bool) public whitelistedAllocators;
+    
+    // Permit2 configuration
+    address public permit2Address;
 
     IDeployerTiny constant ZERO_EX_DEPLOYER = IDeployerTiny(0x00000000000004533Fe15556B1E086BB1A72cEae);
 
@@ -51,12 +60,25 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         _;
     }
 
-    constructor(address _myt, StrategyParams memory _params) Ownable(_params.owner) {
+    constructor(address _myt, StrategyParams memory _params, address _permit2Address, address _receiptToken) Ownable(_params.owner) {
         require(_params.owner != address(0));
         require(_myt != address(0));
+        require(_permit2Address != address(0), "Zero Permit2 address");
+        require(_receiptToken != address(0), "Zero receipt token address");
         MYT = IVaultV2(_myt);
+        receiptToken = _receiptToken;
         params = _params;
         adapterId = keccak256(abi.encode(_params.protocol, address(this)));
+        
+        // Initialize Permit2 configuration
+        permit2Address = _permit2Address;
+        
+        // Approve Permit2 for both the vault's asset token and the receipt token
+        IERC20 vaultAsset = IERC20(address(MYT.asset()));
+        vaultAsset.approve(permit2Address, type(uint256).max);
+        IERC20 receiptTokenContract = IERC20(receiptToken);
+        receiptTokenContract.approve(permit2Address, type(uint256).max);
+        
         // TODO add the strategy to the perpetual gauge in an authenticated manner
         // TODO perhap take initial snapshot now to set up start block
     }
@@ -93,13 +115,15 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     /// the respective protocol of this strategy in case we want to bypass
     /// a withdrawal queue or similar mechanism and directly go to a DEX
     function deallocateDex(bytes calldata quote, bool prevSettler) external returns (uint256 ret) {
-        IERC20 asset = IERC20(address(MYT.asset()));
+        IERC20 asset = IERC20(receiptToken);
         // TODO additional access control needed?
         require(whitelistedAllocators[msg.sender], "PD");
         address currentSettler = prevSettler ? ZERO_EX_DEPLOYER.prev(2) : ZERO_EX_DEPLOYER.ownerOf(2);
         uint256 balanceBefore = asset.balanceOf(address(this));
-        uint256 limit = balanceBefore * 10 / 100; // 10% of balance
-        require(ZeroXSwapVerifier.verifySwapCalldata(quote, address(this), address(MYT.asset()), limit));
+        
+        // Set maximum allowed slippage to 10% (1000 bps)
+        uint256 maxSlippageBps = 1000;
+        require(ZeroXSwapVerifier.verifySwapCalldata(quote, address(this), receiptToken, maxSlippageBps));
 
         (bool success,) = currentSettler.call(quote);
         require(success, "SF"); // settler failed
@@ -217,6 +241,22 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         emit Emergency(val);
     }
 
+    /// @notice update Permit2 address and approvals
+    function setPermit2Address(address newAddress) public onlyOwner {
+        require(newAddress != address(0), "Zero address");
+        
+        // Revoke old approvals
+        IERC20 vaultAsset = IERC20(address(MYT.asset()));
+        vaultAsset.approve(permit2Address, 0);
+        IERC20 receiptTokenContract = IERC20(receiptToken);
+        receiptTokenContract.approve(permit2Address, 0);
+        
+        // Set new approvals
+        vaultAsset.approve(newAddress, type(uint256).max);
+        receiptTokenContract.approve(newAddress, type(uint256).max);
+        permit2Address = newAddress;
+    }
+
     /// @notice get the current snapshotted estimated yield for this strategy.
     /// This call does not guarantee the latest up-to-date yield and there might
     /// be discrepancies from the respective protocols numbers.
@@ -243,4 +283,9 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     }
 
     function realAssets() external view virtual returns (uint256) {}
+    
+    /// @notice ERC-1271 interface for Permit2 signature verification
+    function isValidSignature(bytes32 _hash, bytes memory _signature) public view returns (bytes4) {
+        return IPermit2(permit2Address).isValidSignature(_hash, _signature);
+    }
 }
