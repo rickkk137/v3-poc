@@ -69,7 +69,7 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         MYT = IVaultV2(_myt);
         receiptToken = _receiptToken;
         params = _params;
-        adapterId = keccak256(abi.encode(_params.protocol, address(this)));
+        adapterId = keccak256(abi.encode(_params.protocol));
         
 
         permit2Address = _permit2Address;
@@ -111,7 +111,6 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         emit MYTLog("oldAllocation", oldAllocation);
         uint256 amountDeallocated = _deallocate(assets);
         emit MYTLog("amountDeallocated", amountDeallocated);
-
         uint256 newAllocation = oldAllocation - amountDeallocated;
         emit MYTLog("newAllocation", newAllocation);
         emit Deallocate(amountDeallocated, address(this));
