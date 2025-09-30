@@ -299,7 +299,6 @@ contract MYTStrategyTest is Test {
         alchemist.deposit(10e18, user, 0);
         vm.stopPrank();
     }
-
 }
 
 // Mock vault implementation

@@ -30,6 +30,7 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     address public immutable receiptToken;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
+    uint256 public constant MIN_SNAPSHOT_INTERVAL = 1 days;
 
     IMYTStrategy.StrategyParams public params;
     bytes32 public immutable adapterId;
@@ -88,6 +89,9 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         onlyVault
         returns (bytes32[] memory strategyIds, int256 change)
     {
+        if (killSwitch) {
+            return (ids(), int256(0));
+        }
         uint256 oldAllocation = abi.decode(data, (uint256));
         uint256 amountAllocated = _allocate(assets);
         uint256 newAllocation = oldAllocation + amountAllocated;
@@ -100,6 +104,9 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         onlyVault
         returns (bytes32[] memory strategyIds, int256 change)
     {
+        if (killSwitch) {
+            return (ids(), int256(0));
+        }
         uint256 oldAllocation = abi.decode(data, (uint256));
         emit MYTLog("oldAllocation", oldAllocation);
         uint256 amountDeallocated = _deallocate(assets);
@@ -115,6 +122,7 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     /// the respective protocol of this strategy in case we want to bypass
     /// a withdrawal queue or similar mechanism and directly go to a DEX
     function deallocateDex(bytes calldata quote, bool prevSettler) external returns (uint256 ret) {
+        require(!killSwitch, "emergency");
         IERC20 asset = IERC20(receiptToken);
         // TODO additional access control needed?
         require(whitelistedAllocators[msg.sender], "PD");
@@ -134,12 +142,15 @@ contract MYTStrategy is IMYTStrategy, Ownable {
 
     /// @notice call this function to handle strategies with withdrawal queue NFT
     function claimWithdrawalQueue(uint256 positionId) public virtual returns (uint256 ret) {
+        require(whitelistedAllocators[msg.sender], "PD");
+        require(!killSwitch, "emergency");
         _claimWithdrawalQueue(positionId);
     }
 
     /// @notice call this function to claim all available rewards from the respective
     /// protocol of this strategy
     function claimRewards() public virtual returns (uint256) {
+        require(!killSwitch, "emergency");
         _claimRewards();
     }
 
@@ -164,10 +175,10 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     function snapshotYield() public virtual returns (uint256) {
         uint256 currentTime = block.timestamp;
 
-        // todo decide to implement this
-        // if (lastSnapshotTime != 0 && currentTime - lastSnapshotTime < MIN_SNAPSHOT_INTERVAL) {
-        //     return estApy;
-        // }
+
+        if (lastSnapshotTime != 0 && currentTime - lastSnapshotTime < MIN_SNAPSHOT_INTERVAL) {
+             return estApy;
+        }
 
         // Base rate of strategy
         (uint256 baseRatePerSec, uint256 newIndex) = _computeBaseRatePerSecond();
