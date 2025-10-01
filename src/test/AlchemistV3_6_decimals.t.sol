@@ -79,11 +79,14 @@ contract AlchemistV3Test is Test {
     // account funds to make deposits/test with
     uint256 accountFunds;
 
+    // deposit to vault funds to make deposits/test with
+    uint256 depositToVaultFunds;
+
     // large amount to test with
     uint256 whaleSupply;
 
-    // amount of yield/underlying token to deposit
-    uint256 depositAmount;
+    // MYT shares are always 18 decimals
+    uint256 depositAmount = 100_000e18;
 
     // minimum amount of yield/underlying token to deposit
     uint256 minimumDeposit = 1000e18;
@@ -120,10 +123,8 @@ contract AlchemistV3Test is Test {
     uint256 public defaultStrategyAbsoluteCap = 2_000_000_000e18;
     uint256 public defaultStrategyRelativeCap = 1e18; // 100%
 
-    event TestLogUint256(string message, uint256 value);
-
     function setUp() external {
-        adJustTestFunds(18);
+        adJustTestFunds(6);
         setUpMYT(6);
         deployCoreContracts(6);
     }
@@ -131,7 +132,6 @@ contract AlchemistV3Test is Test {
     function adJustTestFunds(uint256 alchemistUnderlyingTokenDecimals) public {
         accountFunds = 200_000 * 10 ** alchemistUnderlyingTokenDecimals;
         whaleSupply = 20_000_000_000 * 10 ** alchemistUnderlyingTokenDecimals;
-        depositAmount = 200_000 * 10 ** alchemistUnderlyingTokenDecimals;
     }
 
     function setUpMYT(uint256 alchemistUnderlyingTokenDecimals) public {
@@ -277,7 +277,9 @@ contract AlchemistV3Test is Test {
 
         uint256 feeVaultPreviousBalance = alchemistFeeVault.totalDeposits();
         // modify yield token price via modifying underlying token supply
-        (, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        (uint256 prevCollateral, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        emit TestLogUint256("prevCollateral", prevCollateral);
+        emit TestLogUint256("prevDebt", prevDebt);
         uint256 initialVaultSupply = IERC20(address(mockStrategyYieldToken)).totalSupply();
         IMockYieldToken(mockStrategyYieldToken).updateMockTokenSupply(initialVaultSupply);
         // increasing yeild token suppy by 4000 bps or 40% while keeping the unederlying supply unchanged
@@ -291,7 +293,7 @@ contract AlchemistV3Test is Test {
         uint256 liquidatorPrevUnderlyingBalance = IERC20(vault.asset()).balanceOf(address(externalUser));
         uint256 alchemistCurrentCollateralization =
             alchemist.normalizeUnderlyingTokensToDebt(alchemist.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / alchemist.totalDebt();
-        (uint256 liquidationAmount, uint256 expectedDebtToBurn,,) = alchemist.calculateLiquidation(
+        (uint256 liquidationAmount, uint256 expectedDebtToBurn, uint256 expectedBaseFee,) = alchemist.calculateLiquidation(
             alchemist.totalValue(tokenIdFor0xBeef),
             prevDebt,
             alchemist.minimumCollateralization(),
@@ -299,13 +301,16 @@ contract AlchemistV3Test is Test {
             alchemist.globalMinimumCollateralization(),
             liquidatorFeeBPS
         );
+        uint256 transmuterPreviousBalance = IERC20(address(vault)).balanceOf(address(transmuterLogic));
         uint256 expectedLiquidationAmountInYield = alchemist.convertDebtTokensToYield(liquidationAmount);
         uint256 expectedFeeInDebtTokens = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
         // expected debt to burn is in debt tokens. converting to underlying for testing
         uint256 expectedFeeInUnderlying = alchemist.normalizeDebtTokensToUnderlying(expectedFeeInDebtTokens);
         uint256 adjustedExpectedFeeInUnderlying = feeVaultPreviousBalance > expectedFeeInUnderlying ? expectedFeeInUnderlying : feeVaultPreviousBalance;
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = alchemist.liquidate(tokenIdFor0xBeef);
-        // (uint256 depositedCollateral, uint256 debt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        uint256 expectedBaseFeeInYield = alchemist.convertDebtTokensToYield(expectedBaseFee);
+
+        (uint256 postCollateral, uint256 postDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
         vm.stopPrank();
         // ensure liquidator fee is correct (3% of surplus (account collateral - debt)
         vm.assertApproxEqAbs(feeInYield, 0, 1e18);
@@ -314,7 +319,13 @@ contract AlchemistV3Test is Test {
         _validateLiquidiatorState(
             externalUser, liquidatorPrevTokenBalance, liquidatorPrevUnderlyingBalance, feeInYield, feeInUnderlying, assets, expectedLiquidationAmountInYield
         );
+        _validateLiquidatedAccountState(tokenIdFor0xBeef, prevCollateral, prevDebt, expectedDebtToBurn, expectedLiquidationAmountInYield);
         vm.assertApproxEqAbs(alchemistFeeVault.totalDeposits(), feeVaultPreviousBalance - adjustedExpectedFeeInUnderlying, 1e18);
+        vm.assertApproxEqAbs(
+            IERC20(address(vault)).balanceOf(address(transmuterLogic)),
+            transmuterPreviousBalance + expectedLiquidationAmountInYield - expectedBaseFeeInYield,
+            1e18
+        );
     }
 
     function _validateLiquidiatorState(
@@ -331,5 +342,21 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, prevTokenBalance + feeInYield, 1e18);
         vm.assertApproxEqAbs(liquidatorPostUnderlyingBalance, prevUnderlyingBalance + feeInUnderlying, 1e18);
         vm.assertApproxEqAbs(assets, exepctedLiquidationTotalAmountInYield, minimumDepositOrWithdrawalLoss);
+    }
+
+    function _validateLiquidatedAccountState(
+        uint256 tokenId,
+        uint256 prevCollateral,
+        uint256 prevDebt,
+        uint256 expectedDebtToBurn,
+        uint256 expectedLiquidationAmountInYield
+    ) internal view {
+        (uint256 depositedCollateral, uint256 debt,) = alchemist.getCDP(tokenId);
+
+        // ensure debt is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
+        vm.assertApproxEqAbs(debt, prevDebt - expectedDebtToBurn, minimumDepositOrWithdrawalLoss);
+
+        // ensure depositedCollateral is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
+        vm.assertApproxEqAbs(depositedCollateral, prevCollateral - expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
     }
 }
