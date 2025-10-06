@@ -61,7 +61,7 @@ contract Transmuter is ITransmuter, ERC721 {
     IAlchemistV3 public alchemist;
 
     /// @dev Array of registered alchemists.
-    address[] public alchemists;
+    address[] public alchemists; 
 
     /// @dev Map of user positions data.
     mapping(uint256 => StakingPosition) private _positions;

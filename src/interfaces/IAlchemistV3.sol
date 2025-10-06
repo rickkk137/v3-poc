@@ -13,8 +13,6 @@ struct AlchemistInitializationParams {
     address yieldToken;
     // The global maximum amount of deposited collateral.
     uint256 depositCap;
-    // Chain specific number of blocks within 1 year.
-    uint256 blocksPerYear;
     // The minimum collateralization between 0 and 1 exclusive
     uint256 minimumCollateralization;
     // The global minimum collateralization, >= minimumCollateralization.
@@ -49,8 +47,6 @@ struct Account {
     uint256 freeCollateral;
     /// @notice Last weight of earmark from most recent account sync.
     uint256 lastAccruedEarmarkWeight;
-    /// @notice Last weight of normalized earmark from most recent account sync.
-    uint256 lastAccruedNormalizedEarmarkWeight;
     /// @notice Last weight of redemption from most recent account sync.
     uint256 lastAccruedRedemptionWeight;
     /// @notice Last weight of collateral from most recent account sync.
@@ -63,6 +59,9 @@ struct Account {
     mapping(uint256 => mapping(address => uint256)) mintAllowances;
     /// @notice id used in the mintAllowances map which is incremented on reset.
     uint256 allowancesVersion;
+
+
+    uint256 lastSurvivalAccumulator;
 }
 
 /// @notice Information associated with a redemption.
@@ -613,8 +612,6 @@ interface IAlchemistV3State {
     function depositCap() external view returns (uint256 cap);
 
     function guardians(address guardian) external view returns (bool isActive);
-
-    function blocksPerYear() external view returns (uint256 blocks);
 
     function cumulativeEarmarked() external view returns (uint256 earmarked);
 

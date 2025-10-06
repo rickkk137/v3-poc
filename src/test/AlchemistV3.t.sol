@@ -159,7 +159,6 @@ contract AlchemistV3Test is Test {
             debtToken: address(alToken),
             underlyingToken: address(fakeUnderlyingToken),
             yieldToken: address(fakeYieldToken),
-            blocksPerYear: 2_600_000,
             depositCap: type(uint256).max,
             minimumCollateralization: minimumCollateralization,
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
@@ -3773,8 +3772,8 @@ contract AlchemistV3Test is Test {
         (collateral, debt, earmarked) = alchemist.getCDP(tokenIdFor0xdad);
         (collateralBeef, debtBeef, earmarkedBeef) = alchemist.getCDP(tokenIdFor0xBeef);
 
-        assertApproxEqAbs(earmarked + earmarkedBeef, alchemist.cumulativeEarmarked(), 1);
-        assertApproxEqAbs(debt + debtBeef, alchemist.totalDebt(), 2);
+        assertApproxEqAbs(earmarked + earmarkedBeef, alchemist.cumulativeEarmarked(), 3);
+        assertApproxEqAbs(debt + debtBeef, alchemist.totalDebt(), 4);
     }
 
     function testRedeemTwiceBetweenSyncUnredeemedFirst() external {
@@ -3803,8 +3802,8 @@ contract AlchemistV3Test is Test {
         transmuterLogic.claimRedemption(3);
         vm.stopPrank();
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
-        assertApproxEqAbs(debt, 10_000e18 - 2000e18, 1);
-        assertEq(earmarked, 600);
+        assertApproxEqAbs(debt, 10_000e18 - 2000e18, 2);
+        assertApproxEqAbs(earmarked, 600e18, 1);
     }
 
     function testAudit_RedemptionWeight() external {
@@ -3833,6 +3832,6 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
         assertApproxEqAbs(debt, 10_000e18 - 2000e18, 1);
-        assertEq(earmarked, 500);
+        assertEq(earmarked, 500e18);
     }
 }

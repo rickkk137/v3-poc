@@ -151,7 +151,6 @@ contract IntegrationTest is Test {
             underlyingToken: USDC,
             yieldToken: EULER_USDC,
             depositCap: type(uint256).max,
-            blocksPerYear: 2_600_000,
             minimumCollateralization: minimumCollateralization,
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1

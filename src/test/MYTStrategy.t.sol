@@ -110,7 +110,6 @@ contract MYTStrategyTest is Test {
             debtToken: address(alToken),
             underlyingToken: address(fakeUnderlyingToken),
             yieldToken: address(yieldToken),
-            blocksPerYear: 2_600_000,
             depositCap: type(uint256).max,
             minimumCollateralization: 150e18,
             collateralizationLowerBound: 110e18,

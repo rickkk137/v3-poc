@@ -152,7 +152,6 @@ contract InvariantsTest is Test {
             underlyingToken: address(fakeUnderlyingToken),
             yieldToken: address(fakeYieldToken),
             depositCap: type(uint256).max,
-            blocksPerYear: 2_600_000,
             minimumCollateralization: minimumCollateralization,
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
