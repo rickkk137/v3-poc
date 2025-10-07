@@ -36,7 +36,6 @@ struct AlchemistInitializationParams {
 /// @notice A user account.
 /// @notice This account struct is included in the main contract, AlchemistV3.sol, to aid readability.
 struct Account {
-    uint256 accumulator;
     /// @notice User's collateral.
     uint256 collateralBalance;
     /// @notice User's debt.
@@ -59,7 +58,6 @@ struct Account {
     mapping(uint256 => mapping(address => uint256)) mintAllowances;
     /// @notice id used in the mintAllowances map which is incremented on reset.
     uint256 allowancesVersion;
-
 
     uint256 lastSurvivalAccumulator;
 }

@@ -3807,7 +3807,6 @@ contract AlchemistV3Test is Test {
     }
 
     function testAudit_RedemptionWeight() external {
-        // This test fails because we do not have proper handling of redemptions that fully consume available earmark
         vm.startPrank(address(0xbeef));
         IERC20(fakeYieldToken).approve(address(alchemist), 100_000e18);
         alchemist.deposit(100_000e18, address(0xbeef), 0);

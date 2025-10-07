@@ -17,8 +17,6 @@ import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./b
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IAlchemistTokenVault} from "./interfaces/IAlchemistTokenVault.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 /// @title  AlchemistV3
 /// @author Alchemix Finance
 contract AlchemistV3 is IAlchemistV3, Initializable {
@@ -519,8 +517,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 creditToYield = convertDebtTokensToYield(credit);
 
         // Repay debt from earmarked amount of debt first
-        uint256 earmarkToRemove = credit > account.earmarked ? account.earmarked : credit; // DEBT units
-        _decreaseEarmark(account, earmarkToRemove);
+        uint256 earmarkToRemove = credit > account.earmarked ? account.earmarked : credit;
+        account.earmarked -= earmarkToRemove;
 
         uint256 earmarkPaidGlobal = cumulativeEarmarked > earmarkToRemove ? earmarkToRemove : cumulativeEarmarked;
         cumulativeEarmarked -= earmarkPaidGlobal;
@@ -749,7 +747,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Repay debt from earmarked amount of debt first
         uint256 earmarkToRemove = credit > account.earmarked ? account.earmarked : credit;
-        _decreaseEarmark(account, earmarkToRemove);
+        account.earmarked -= earmarkToRemove;
 
         creditToYield = creditToYield > account.collateralBalance ? account.collateralBalance : creditToYield;
         account.collateralBalance -= creditToYield;
@@ -912,7 +910,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         totalDebt += amount;
     }
 
-    /// @dev Increases the debt by `amount` for the account owned by `tokenId`.
+    /// @dev Subtracts the debt by `amount` for the account owned by `tokenId`.
+    ///
     /// @param tokenId   The account owned by tokenId.
     /// @param amount  The amount to decrease the debt by.
     function _subDebt(uint256 tokenId, uint256 amount) internal {
@@ -1052,11 +1051,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Unwind accumulated earmarked at last sync
         uint256 unredeemedRatio = _divQ128(survivalDiff, earmarkSurvival);
         // Portion of earmark that remains after applying the redemption. Scaled back from 128.128
-        uint256 earmarkedUnredeemed = (userExposure * unredeemedRatio) >> 128;
+        uint256 earmarkedUnredeemed = _mulQ128(userExposure, unredeemedRatio);
         if (earmarkedUnredeemed > earmarkRaw) earmarkedUnredeemed = earmarkRaw;
 
         // Old earmarks that survived redemptions in the current sync window
-        uint256 exposureSurvival = (account.earmarked * survivalRatio) >> 128;
+        uint256 exposureSurvival = _mulQ128(account.earmarked, survivalRatio);
 
         // What was redeemed from the newly earmark between last sync and now
         uint256 redeemedFromEarmarked = earmarkRaw - earmarkedUnredeemed;
@@ -1065,13 +1064,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         account.earmarked = exposureSurvival + earmarkedUnredeemed;
         account.debt = account.debt >= redeemedTotal ? account.debt - redeemedTotal : 0;
-
-        // Accumulator for repay helper _decreaseEarmark()
-        if (redemptionSurvivalNew == 0) {
-            account.accumulator = 0;
-        } else {
-            account.accumulator = (account.earmarked << 128) / redemptionSurvivalNew;
-        }
 
         // Update locked collateral
         account.rawLocked = convertDebtTokensToYield(account.debt) * minimumCollateralization / FIXED_POINT_SCALAR;
@@ -1109,7 +1101,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             if (previousSurvival == 0) previousSurvival = ONE_Q128;
 
             // Fraction of unearmarked debt being earmarked now in UQ128.128
-            uint256 earmarkedFraction = (amount << 128) / liveUnearmarked;
+            uint256 earmarkedFraction = _divQ128(amount, liveUnearmarked);
 
             _survivalAccumulator += _mulQ128(previousSurvival, earmarkedFraction);
             _earmarkWeight += PositionDecay.WeightIncrement(amount, liveUnearmarked);
@@ -1118,30 +1110,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         }
 
         lastEarmarkBlock = block.number;
-    }
-
-    // Decrease earmarked debt by `amountDebt` (in DEBT units) by
-    // reducing the accumulator so that views/sync agree.
-    function _decreaseEarmark(Account storage account, uint256 amountDebt) internal {
-        if (amountDebt == 0) return;
-
-        uint256 survival = PositionDecay.SurvivalFromWeight(_redemptionWeight);
-        if (survival == 0) {
-            // If survival underflowed to 0, all earmark has effectively decayed.
-            account.accumulator = 0;
-            account.earmarked = 0;
-            return;
-        }
-
-        // To reduce earmark by ΔE in plain debt units,
-        uint256 deltaA = (amountDebt << 128) / survival;
-
-        // reduce accumulator by ΔA = (ΔE << 128) / survival.
-        uint256 acc = account.accumulator;
-        account.accumulator = deltaA > acc ? 0 : acc - deltaA;
-
-        // Keep the cached field coherent for any direct reads in this block.
-        account.earmarked = (account.accumulator * survival) >> 128;
     }
 
     /// @dev Gets the amount of debt that the account owned by `owner` will have after a sync occurs.
@@ -1182,7 +1150,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
                 if (previousSurvival == 0) previousSurvival = ONE_Q128;
 
                 // Fraction of unearmarked debt being earmarked now in UQ128.128
-                uint256 earmarkedFraction = (amount << 128) / liveUnearmarked;
+                uint256 earmarkedFraction = _divQ128(amount, liveUnearmarked);
 
                 survivalAccumulatorCopy += _mulQ128(previousSurvival, earmarkedFraction);
                 earmarkWeightCopy += PositionDecay.WeightIncrement(amount, liveUnearmarked);
@@ -1213,11 +1181,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Unwind accumulated earmarked at last sync
         uint256 unredeemedRatio = _divQ128(survivalDiff, earmarkSurvival);
         // Portion of earmark that remains after applying the redemption. Scaled back from 128.128
-        uint256 earmarkedUnredeemed = (userExposure * unredeemedRatio) >> 128;
+        uint256 earmarkedUnredeemed = _mulQ128(userExposure, unredeemedRatio);
         if (earmarkedUnredeemed > earmarkRaw) earmarkedUnredeemed = earmarkRaw;
 
         // Old earmarks that survived redemptions in the current sync window
-        uint256 exposureSurvival = (account.earmarked * survivalRatio) >> 128;
+        uint256 exposureSurvival = _mulQ128(account.earmarked, survivalRatio);
 
         // What was redeemed from the newly earmark between last sync and now
         uint256 redeemedFromEarmarked = earmarkRaw - earmarkedUnredeemed;
