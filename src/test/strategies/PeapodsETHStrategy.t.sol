@@ -38,7 +38,7 @@ contract PeapodsETHStrategyTest is BaseStrategyTest {
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {
-        return 22_089_302;
+        return 0;
     }
 
     function getRpcUrl() internal view override returns (string memory) {

@@ -21,6 +21,10 @@ interface IERC4626 {
     function previewWithdraw(uint256 assets) external view returns (uint256 shares);
 }
 
+/**
+ * @title MorphoYearnOGWETHStrategy
+ * @notice This strategy is used to allocate and deallocate weth to the Morpho Yearn OG WETH vault on Mainnet
+ */
 contract MorphoYearnOGWETHStrategy is MYTStrategy {
     WETH public immutable weth;
     IERC4626 public immutable vault;
@@ -35,18 +39,25 @@ contract MorphoYearnOGWETHStrategy is MYTStrategy {
         require(vault.asset() == _weth, "Vault asset != WETH");
     }
 
-    function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
+    function _allocate(uint256 amount) internal override returns (uint256) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
-        depositReturn = amount;
         TokenUtils.safeApprove(address(weth), address(vault), amount);
         vault.deposit(amount, address(this));
+        return amount;
     }
 
-    function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
+    function _deallocate(uint256 amount) internal override returns (uint256) {
         vault.withdraw(amount, address(this), address(this));
-        withdrawReturn = amount;
+        uint256 wethBalanceBefore = TokenUtils.safeBalanceOf(address(weth), address(this));
+        uint256 wethBalanceAfter = TokenUtils.safeBalanceOf(address(weth), address(this));
+        uint256 wethRedeemed = wethBalanceAfter - wethBalanceBefore;
+        if (wethRedeemed < amount) {
+            emit StrategyDeallocationLoss("Strategy deallocation loss.", amount, wethRedeemed);
+        }
+        require(wethRedeemed + wethBalanceBefore >= amount, "Strategy balance is less than the amount needed");
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than the amount needed");
         TokenUtils.safeApprove(address(weth), msg.sender, amount);
+        return amount;
     }
 
     function realAssets() external view override returns (uint256) {

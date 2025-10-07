@@ -11,6 +11,10 @@ interface WETH {
     function withdraw(uint256) external;
 }
 
+/**
+ * @title PeapodsETHStrategy
+ * @notice This strategy is used to allocate and deallocate weth to the Peapods ETH vault on Mainnet
+ */
 contract PeapodsETHStrategy is MYTStrategy {
     IERC4626 public immutable vault;
     WETH public immutable weth;
@@ -22,18 +26,24 @@ contract PeapodsETHStrategy is MYTStrategy {
         weth = WETH(_weth);
     }
 
-    function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
+    function _allocate(uint256 amount) internal override returns (uint256) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
-        depositReturn = amount;
         TokenUtils.safeApprove(address(weth), address(vault), amount);
         vault.deposit(amount, address(this));
+        return amount;
     }
 
-    function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
+    function _deallocate(uint256 amount) internal override returns (uint256) {
+        uint256 wethBalanceBefore = TokenUtils.safeBalanceOf(address(weth), address(this));
         vault.withdraw(amount, address(this), address(this));
-        withdrawReturn = amount;
+        uint256 wethBalanceAfter = TokenUtils.safeBalanceOf(address(weth), address(this));
+        uint256 wethRedeemed = wethBalanceAfter - wethBalanceBefore;
+        if (wethRedeemed < amount) {
+            emit StrategyDeallocationLoss("Strategy deallocation loss.", amount, wethRedeemed);
+        }
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than the amount needed");
         TokenUtils.safeApprove(address(weth), msg.sender, amount);
+        return amount;
     }
 
     function _computeBaseRatePerSecond() internal override returns (uint256 ratePerSec, uint256 newIndex) {

@@ -161,7 +161,7 @@ contract TokeAutoETHStrategyTest is BaseStrategyTest {
             globalCap: 1e18,
             estimatedYield: 100e18,
             additionalIncentives: false,
-            slippageBPS: 1
+            slippageBPS: 1000
         });
     }
 

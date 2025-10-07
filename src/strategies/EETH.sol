@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.28;
+
 import "forge-std/console.sol";
 import {MYTStrategy} from "../MYTStrategy.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
@@ -24,6 +25,11 @@ interface DEBUG {
     function balanceOf(address owner) external returns (uint256);
 }
 
+/**
+ * TODO: Incomplete, Need to fully implement this strategy
+ * @title EETHMYTStrategy
+ * @notice This strategy is used to allocate and deallocate EETH to the EETH vault on Mainnet
+ */
 contract EETHMYTStrategy is MYTStrategy {
     DepositAdapter public immutable depositAdapter;
     RedemptionManager public immutable redemptionManager;
@@ -64,10 +70,9 @@ contract EETHMYTStrategy is MYTStrategy {
 
         require(amount <= address(lp).balance, "LIQ");
         require(redemptionManager.canRedeem(amount), "do not redeeeeeem");
-        
+
         // Approve redemption manager to spend weETH
         TokenUtils.safeApprove(address(receiptToken), address(redemptionManager), amount);
-        
 
         uint256 redemptionAmount = redemptionManager.redeemWeEth(amount, address(this));
         // FIXME unspecified revert right after redeemWeEth returns ?
@@ -77,10 +82,10 @@ contract EETHMYTStrategy is MYTStrategy {
             weth.deposit{value: ethBalance}();
             TokenUtils.safeTransfer(address(weth), address(MYT), ethBalance);
         }
-        
+
         // Reset approval to zero
         TokenUtils.safeApprove(address(receiptToken), address(redemptionManager), 0);
-        
+
         return redemptionAmount;
     }
 

@@ -9,12 +9,13 @@ interface IERC20 {
     function approve(address, uint256) external returns (bool);
 }
 
+/**
+ * @title EulerWETHStrategy
+ * @notice This strategy is used to allocate and deallocate weth to the Euler WETH vault on Mainnet
+ */
 contract EulerWETHStrategy is MYTStrategy {
-    // Mainnet WETH and Euler wETH EVK vault (ERC-4626)
-    // WETH:  0xC02aaA39b223FE8D0A0E5C4F27eAD9083C756Cc2
-    // EVK:   0xD8b27CF359b7D15710a5BE299AF6e7Bf904984C2
-    IERC20 public immutable weth; // 0xC02aaA39b223FE8D0A0E5C4F27eAD9083C756Cc2
-    IERC4626 public immutable vault; // 0xD8b27CF359b7D15710a5BE299AF6e7Bf904984C2
+    IERC20 public immutable weth; // Mainnet WETH
+    IERC4626 public immutable vault;
 
     constructor(address _myt, StrategyParams memory _params, address _weth, address _eulerVault, address _permit2Address)
         MYTStrategy(_myt, _params, _permit2Address, _weth)
@@ -23,18 +24,25 @@ contract EulerWETHStrategy is MYTStrategy {
         vault = IERC4626(_eulerVault);
     }
 
-    function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
+    function _allocate(uint256 amount) internal override returns (uint256) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
-        depositReturn = amount;
         TokenUtils.safeApprove(address(weth), address(vault), amount);
         vault.deposit(amount, address(this));
+        return amount;
     }
 
-    function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
+    function _deallocate(uint256 amount) internal override returns (uint256) {
+        uint256 wethBalanceBefore = TokenUtils.safeBalanceOf(address(weth), address(this));
         vault.withdraw(amount, address(this), address(this));
-        withdrawReturn = amount;
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than the amount needed");
         TokenUtils.safeApprove(address(weth), msg.sender, amount);
+        uint256 wethBalanceAfter = TokenUtils.safeBalanceOf(address(weth), address(this));
+        uint256 wethRedeemed = wethBalanceAfter - wethBalanceBefore;
+        if (wethRedeemed < amount) {
+            emit StrategyDeallocationLoss("Strategy deallocation loss.", amount, wethRedeemed);
+        }
+        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than the amount needed");
+        return amount;
     }
 
     function realAssets() external view override returns (uint256) {

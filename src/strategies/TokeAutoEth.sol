@@ -17,6 +17,11 @@ interface RootOracle {
     function getPriceInEth(address token) external returns (uint256 price);
 }
 
+/**
+ * TODO: Incomplete, Need to fully implement this strategy
+ * @title TokeAutoEthStrategy
+ * @notice This strategy is used to allocate and deallocate autoEth to the TokeAutoEth vault on Mainnet
+ */
 contract TokeAutoEthStrategy is MYTStrategy {
     IERC4626 public immutable autoEth;
     IAutopilotRouter public immutable router;
@@ -45,39 +50,28 @@ contract TokeAutoEthStrategy is MYTStrategy {
     }
 
     // @dev Impleenetation can alternatively make use of a multicall
-    function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
+    function _allocate(uint256 amount) internal override returns (uint256) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
-        depositReturn = amount;
         TokenUtils.safeApprove(address(weth), address(router), amount);
         uint256 shares = router.depositMax(autoEth, address(this), 0);
         // Stake on behalf of MYT
-        autoEth.approve(address(rewarder), shares);
-        rewarder.stake(address(this), shares);
+        /*  autoEth.approve(address(rewarder), shares);
+        rewarder.stake(address(this), shares); */
+        return amount;
     }
 
     // todo slippage checks
-    function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
-        uint256 sharesNeeded = _previewAdjustedWithdraw(amount);
-        emit TokeAutoETHStrategyTestLog("sharesNeeded", sharesNeeded);
-        rewarder.withdraw(address(this), sharesNeeded, false);
-        emit TokeAutoETHStrategyTestLog("withdrawnnn", sharesNeeded);
-        autoEth.redeem(sharesNeeded, address(this), address(this));
-        emit TokeAutoETHStrategyTestLog("redeemed", sharesNeeded);
-        withdrawReturn = amount;
-        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= withdrawReturn, "Strategy balance is less than amount");
+    function _deallocate(uint256 amount) internal override returns (uint256) {
+        // shares to assets
+        uint256 assets = amount;
+        router.withdrawVaultToken(autoEth, rewarder, assets, false);
+        // autoEth.redeem(withdrawReturn, address(this), address(this));
+        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
         TokenUtils.safeApprove(address(weth), msg.sender, amount);
+        return amount;
     }
 
     function _previewAdjustedWithdraw(uint256 amount) internal view override returns (uint256) {
-        uint256 shareBalance = autoEth.balanceOf(msg.sender);
-
-        // Shares ecpected to be recieved from rewarder for this amount
-        // uint256 shares = autoEth.previewWithdraw(amount);
-        //uint256 shares = amount;
-
-        // Assets expected to be recieved from autoEth for this number of shares
-        // uint256 assets = autoEth.convertToAssets(amount);
-        // Slippage protection
         return amount - (amount * slippageBPS / 10_000);
     }
 
@@ -132,7 +126,9 @@ contract TokeAutoEthStrategy is MYTStrategy {
     }
 
     function realAssets() external view override returns (uint256) {
-        uint256 stakedShares = rewarder.balanceOf(address(this));
-        return autoEth.convertToAssets(stakedShares);
+        /*    uint256 stakedShares = rewarder.balanceOf(address(this));
+        return autoEth.convertToAssets(stakedShares); */
+
+        return autoEth.convertToAssets(autoEth.balanceOf(address(this)));
     }
 }

@@ -9,6 +9,10 @@ interface IERC20 {
     function approve(address, uint256) external returns (bool);
 }
 
+/**
+ * @title EulerUSDCStrategy
+ * @notice This strategy is used to allocate and deallocate usdc to the Euler USDC vault on Mainnet
+ */
 contract EulerUSDCStrategy is MYTStrategy {
     IERC20 public immutable usdc; // 0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48
     IERC4626 public immutable vault; // 0xe0a80d35bB6618CBA260120b279d357978c42BCE
@@ -20,18 +24,25 @@ contract EulerUSDCStrategy is MYTStrategy {
         vault = IERC4626(_eulerVault);
     }
 
-    function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
+    function _allocate(uint256 amount) internal override returns (uint256) {
         require(TokenUtils.safeBalanceOf(address(usdc), address(this)) >= amount, "Strategy balance is less than amount");
-        depositReturn = amount;
         TokenUtils.safeApprove(address(usdc), address(vault), amount);
         vault.deposit(amount, address(this));
+        return amount;
     }
 
-    function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
+    function _deallocate(uint256 amount) internal override returns (uint256) {
+        uint256 usdcBalanceBefore = TokenUtils.safeBalanceOf(address(usdc), address(this));
         vault.withdraw(amount, address(this), address(this));
-        withdrawReturn = amount;
         require(TokenUtils.safeBalanceOf(address(usdc), address(this)) >= amount, "Strategy balance is less than the amount needed");
         TokenUtils.safeApprove(address(usdc), msg.sender, amount);
+        uint256 usdcBalanceAfter = TokenUtils.safeBalanceOf(address(usdc), address(this));
+        uint256 usdcRedeemed = usdcBalanceAfter - usdcBalanceBefore;
+        if (usdcRedeemed < amount) {
+            emit StrategyDeallocationLoss("Strategy deallocation loss.", amount, usdcRedeemed);
+        }
+        require(TokenUtils.safeBalanceOf(address(usdc), address(this)) >= amount, "Strategy balance is less than the amount needed");
+        return amount;
     }
 
     function realAssets() external view override returns (uint256) {

@@ -36,7 +36,7 @@ contract MorphoYearnOGWETHStrategyTest is BaseStrategyTest {
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {
-        return 0;
+        return 23_298_447;
     }
 
     function getRpcUrl() internal view override returns (string memory) {

@@ -31,10 +31,8 @@ abstract contract BaseStrategyTest is Test {
     function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal virtual returns (address);
     function getForkBlockNumber() internal virtual returns (uint256);
     function getRpcUrl() internal virtual returns (string memory);
-
-    event BaseStrategyTestLog(string message, uint256 value);
-
     // Test configuration struct
+
     struct TestConfig {
         address vaultAsset;
         uint256 vaultInitialDeposit;
@@ -142,9 +140,6 @@ abstract contract BaseStrategyTest is Test {
     function test_strategy_deallocate(uint256 amountToAllocate, uint256 amountToDeallocate) public {
         amountToAllocate = bound(amountToAllocate, 1 * 10 ** testConfig.decimals, testConfig.vaultInitialDeposit);
         amountToDeallocate = IMYTStrategy(strategy).previewAdjustedWithdraw(amountToAllocate);
-
-        emit BaseStrategyTestLog("amountToAllocate", amountToAllocate);
-        emit BaseStrategyTestLog("amountToDeallocate", amountToDeallocate);
         vm.startPrank(vault);
         deal(testConfig.vaultAsset, strategy, amountToAllocate);
         bytes memory prevAllocationAmount = abi.encode(0);
@@ -181,7 +176,6 @@ abstract contract BaseStrategyTest is Test {
     }
 
     function test_vault_deallocate_from_strategy(uint256 amountToAllocate, uint256 amountToDeallocate) public {
-        // 1 basis points buffer or 0.01%
         amountToAllocate = bound(amountToAllocate, 1 * 10 ** testConfig.decimals, testConfig.vaultInitialDeposit);
         amountToDeallocate = IMYTStrategy(strategy).previewAdjustedWithdraw(amountToAllocate);
         vm.startPrank(allocator);

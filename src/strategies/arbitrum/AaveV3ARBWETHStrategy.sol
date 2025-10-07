@@ -51,7 +51,7 @@ contract AaveV3ARBWETHStrategy is MYTStrategy {
         if (wethRedeemed < amount) {
             emit StrategyDeallocationLoss("Strategy deallocation loss.", amount, wethRedeemed);
         }
-        require(wethRedeemed + wethBalanceBefore >= amount, "Strategy balance is less than the amount needed");
+        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than the amount needed");
         TokenUtils.safeApprove(address(weth), msg.sender, amount);
         return amount;
     }

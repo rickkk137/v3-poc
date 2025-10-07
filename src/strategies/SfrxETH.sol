@@ -24,13 +24,20 @@ interface StakedFraxEth {
     function balanceOf(address account) external view returns (uint256);
 }
 
+/**
+ * TODO: Incomplete, Need to fully implement this strategy
+ * @title SfrxETHStrategy
+ * @notice This strategy is used to allocate and deallocate weth to the SfrxETH vault on Mainnet
+ */
 contract SfrxETHStrategy is MYTStrategy {
     FraxMinter public immutable minter;
     FraxRedemptionQueue public immutable redemptionQueue;
     StakedFraxEth public immutable sfrxEth;
     address public immutable WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
-    constructor(address _myt, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue, address _permit2Address) MYTStrategy(_myt, _params, _permit2Address, _sfrxEth) {
+    constructor(address _myt, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue, address _permit2Address)
+        MYTStrategy(_myt, _params, _permit2Address, _sfrxEth)
+    {
         minter = FraxMinter(_fraxMinter);
         redemptionQueue = FraxRedemptionQueue(_redemptionQueue);
         sfrxEth = StakedFraxEth(_sfrxEth);

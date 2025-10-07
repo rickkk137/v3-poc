@@ -24,24 +24,24 @@ contract EulerARBWETHStrategy is MYTStrategy {
         vault = IERC4626(_eulerVault);
     }
 
-    function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
+    function _allocate(uint256 amount) internal override returns (uint256) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
-        depositReturn = amount;
         TokenUtils.safeApprove(address(weth), address(vault), amount);
         vault.deposit(amount, address(this));
+        return amount;
     }
 
-    function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
+    function _deallocate(uint256 amount) internal override returns (uint256) {
         uint256 wethBalanceBefore = TokenUtils.safeBalanceOf(address(weth), address(this));
         vault.withdraw(amount, address(this), address(this));
-        withdrawReturn = amount;
         uint256 wethBalanceAfter = TokenUtils.safeBalanceOf(address(weth), address(this));
         uint256 wethRedeemed = wethBalanceAfter - wethBalanceBefore;
         if (wethRedeemed < amount) {
             emit StrategyDeallocationLoss("Strategy deallocation loss.", amount, wethRedeemed);
         }
-        require(wethRedeemed + wethBalanceBefore >= amount, "Strategy balance is less than the amount needed");
+        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than the amount needed");
         TokenUtils.safeApprove(address(weth), msg.sender, amount);
+        return amount;
     }
 
     function realAssets() external view override returns (uint256) {

@@ -40,7 +40,7 @@ contract EulerARBUSDCStrategy is MYTStrategy {
         if (usdcRedeemed < amount) {
             emit StrategyDeallocationLoss("Strategy deallocation loss.", amount, usdcRedeemed);
         }
-        require(usdcRedeemed + usdcBalanceBefore >= amount, "Strategy balance is less than the amount needed");
+        require(TokenUtils.safeBalanceOf(address(usdc), address(this)) >= amount, "Strategy balance is less than the amount needed");
         TokenUtils.safeApprove(address(usdc), msg.sender, amount);
     }
 

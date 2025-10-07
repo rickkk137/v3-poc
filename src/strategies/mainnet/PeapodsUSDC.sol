@@ -20,18 +20,24 @@ contract PeapodsUSDCStrategy is MYTStrategy {
         usdc = IERC20(_usdc);
     }
 
-    function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
+    function _allocate(uint256 amount) internal override returns (uint256) {
         require(TokenUtils.safeBalanceOf(address(usdc), address(this)) >= amount, "Strategy balance is less than amount");
-        depositReturn = amount;
         TokenUtils.safeApprove(address(usdc), address(vault), amount);
         vault.deposit(amount, address(this));
+        return amount;
     }
 
-    function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
+    function _deallocate(uint256 amount) internal override returns (uint256) {
+        uint256 usdcBalanceBefore = TokenUtils.safeBalanceOf(address(usdc), address(this));
         vault.withdraw(amount, address(this), address(this));
-        withdrawReturn = amount;
+        uint256 usdcBalanceAfter = TokenUtils.safeBalanceOf(address(usdc), address(this));
+        uint256 usdcRedeemed = usdcBalanceAfter - usdcBalanceBefore;
+        if (usdcRedeemed < amount) {
+            emit StrategyDeallocationLoss("Strategy deallocation loss.", amount, usdcRedeemed);
+        }
         require(TokenUtils.safeBalanceOf(address(usdc), address(this)) >= amount, "Strategy balance is less than the amount needed");
         TokenUtils.safeApprove(address(usdc), msg.sender, amount);
+        return amount;
     }
 
     function realAssets() external view override returns (uint256) {
