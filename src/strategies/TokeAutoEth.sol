@@ -25,9 +25,18 @@ contract TokeAutoEthStrategy is MYTStrategy {
     RootOracle public immutable oracle;
     address public immutable rewardToken;
 
-    constructor(address _myt, StrategyParams memory _params, address _autoEth, address _router, address _rewarder, address _weth, address _oracle, address _permit2Address)
-        MYTStrategy(_myt, _params, _permit2Address, _autoEth)
-    {
+    event TokeAutoETHStrategyTestLog(string message, uint256 value);
+
+    constructor(
+        address _myt,
+        StrategyParams memory _params,
+        address _autoEth,
+        address _router,
+        address _rewarder,
+        address _weth,
+        address _oracle,
+        address _permit2Address
+    ) MYTStrategy(_myt, _params, _permit2Address, _autoEth) {
         autoEth = IERC4626(_autoEth);
         router = IAutopilotRouter(_router);
         rewarder = IMainRewarder(_rewarder);
@@ -35,22 +44,41 @@ contract TokeAutoEthStrategy is MYTStrategy {
         oracle = RootOracle(_oracle);
     }
 
+    // @dev Impleenetation can alternatively make use of a multicall
     function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
-        depositReturn = router.depositMax(autoEth, address(this), 0);
+        depositReturn = amount;
+        TokenUtils.safeApprove(address(weth), address(router), amount);
+        uint256 shares = router.depositMax(autoEth, address(this), 0);
         // Stake on behalf of MYT
-        autoEth.approve(address(rewarder), depositReturn);
-        rewarder.stake(address(this), depositReturn);
+        autoEth.approve(address(rewarder), shares);
+        rewarder.stake(address(this), shares);
     }
 
     // todo slippage checks
     function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
-        uint256 stakedShares = rewarder.balanceOf(address(this));
-        uint256 sharesToWithdraw = amount > stakedShares ? stakedShares : amount;
-        rewarder.withdraw(address(this), sharesToWithdraw, false);
-        withdrawReturn = autoEth.redeem(sharesToWithdraw, address(this), address(this));
+        uint256 sharesNeeded = _previewAdjustedWithdraw(amount);
+        emit TokeAutoETHStrategyTestLog("sharesNeeded", sharesNeeded);
+        rewarder.withdraw(address(this), sharesNeeded, false);
+        emit TokeAutoETHStrategyTestLog("withdrawnnn", sharesNeeded);
+        autoEth.redeem(sharesNeeded, address(this), address(this));
+        emit TokeAutoETHStrategyTestLog("redeemed", sharesNeeded);
+        withdrawReturn = amount;
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= withdrawReturn, "Strategy balance is less than amount");
-        TokenUtils.safeApprove(address(weth), msg.sender, withdrawReturn);
+        TokenUtils.safeApprove(address(weth), msg.sender, amount);
+    }
+
+    function _previewAdjustedWithdraw(uint256 amount) internal view override returns (uint256) {
+        uint256 shareBalance = autoEth.balanceOf(msg.sender);
+
+        // Shares ecpected to be recieved from rewarder for this amount
+        // uint256 shares = autoEth.previewWithdraw(amount);
+        //uint256 shares = amount;
+
+        // Assets expected to be recieved from autoEth for this number of shares
+        // uint256 assets = autoEth.convertToAssets(amount);
+        // Slippage protection
+        return amount - (amount * slippageBPS / 10_000);
     }
 
     function _claimRewards() internal override returns (uint256 rewardsClaimed) {
@@ -106,9 +134,5 @@ contract TokeAutoEthStrategy is MYTStrategy {
     function realAssets() external view override returns (uint256) {
         uint256 stakedShares = rewarder.balanceOf(address(this));
         return autoEth.convertToAssets(stakedShares);
-    }
-
-    receive() external payable {
-        require(msg.sender == address(weth), "Only WETH unwrap");
     }
 }

@@ -1,16 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {MYTStrategy} from "../MYTStrategy.sol";
-import {IMYTStrategy} from "../interfaces/IMYTStrategy.sol";
-import {TokenUtils} from "../libraries/TokenUtils.sol";
-
-interface IERC20 {
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    function approve(address spender, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address to, uint256 amount) external returns (bool);
-}
+import {MYTStrategy} from "../../MYTStrategy.sol";
+import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
+import {TokenUtils} from "../../libraries/TokenUtils.sol";
 
 interface WETH {
     function deposit() external payable;
@@ -25,13 +18,18 @@ interface IERC4626 {
     function convertToShares(uint256 assets) external view returns (uint256 shares);
     function balanceOf(address account) external view returns (uint256);
     function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares);
+    function previewWithdraw(uint256 assets) external view returns (uint256 shares);
 }
 
 contract MorphoYearnOGWETHStrategy is MYTStrategy {
     WETH public immutable weth;
     IERC4626 public immutable vault;
 
-    constructor(address _myt, StrategyParams memory _params, address _vault, address _weth, address _permit2Address) MYTStrategy(_myt, _params, _permit2Address, _weth) {
+    event MorphoYearnOGWETHStrategyDebugLog(string message, uint256 value);
+
+    constructor(address _myt, StrategyParams memory _params, address _vault, address _weth, address _permit2Address)
+        MYTStrategy(_myt, _params, _permit2Address, _weth)
+    {
         weth = WETH(_weth);
         vault = IERC4626(_vault);
         require(vault.asset() == _weth, "Vault asset != WETH");
@@ -39,23 +37,29 @@ contract MorphoYearnOGWETHStrategy is MYTStrategy {
 
     function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
+        depositReturn = amount;
         TokenUtils.safeApprove(address(weth), address(vault), amount);
-        depositReturn = vault.deposit(amount, address(this));
+        vault.deposit(amount, address(this));
     }
 
     function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
-        uint256 shares = vault.convertToShares(amount);
-        withdrawReturn = vault.redeem(shares, address(this), address(this));
-        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= withdrawReturn, "Strategy balance is less than amount");
-        TokenUtils.safeApprove(address(weth), msg.sender, withdrawReturn);
+        vault.withdraw(amount, address(this), address(this));
+        withdrawReturn = amount;
+        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than the amount needed");
+        TokenUtils.safeApprove(address(weth), msg.sender, amount);
     }
 
-    function _unwrapWETH(uint256 amount, address to) internal {
-        weth.withdraw(amount);
-        (bool ok,) = to.call{value: amount}("");
-        require(ok, "ETH send failed");
+    function realAssets() external view override returns (uint256) {
+        return vault.convertToAssets(vault.balanceOf(address(this)));
     }
 
+    function _previewAdjustedWithdraw(uint256 amount) internal view override returns (uint256) {
+        uint256 shares = vault.previewWithdraw(amount);
+        uint256 assets = vault.convertToAssets(shares);
+        return assets - (assets * slippageBPS / 10_000);
+    }
+
+    /* 
     function _computeBaseRatePerSecond() internal override returns (uint256 ratePerSec, uint256 newIndex) {
         uint256 dt = lastSnapshotTime == 0 ? 0 : block.timestamp - lastSnapshotTime;
 
@@ -69,13 +73,5 @@ contract MorphoYearnOGWETHStrategy is MYTStrategy {
         uint256 growth = (currentPPS - lastIndex) * FIXED_POINT_SCALAR / lastIndex;
         ratePerSec = growth / dt;
         return (ratePerSec, newIndex);
-    }
-
-    function realAssets() external view override returns (uint256) {
-        return vault.convertToAssets(vault.balanceOf(address(this)));
-    }
-
-    receive() external payable {
-        require(msg.sender == address(weth), "Only WETH unwrap");
-    }
+    } */
 }

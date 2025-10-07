@@ -19,6 +19,7 @@ interface IMYTStrategy {
         uint256 globalCap;
         uint256 estimatedYield;
         bool additionalIncentives;
+        uint256 slippageBPS;
     }
 
     // Events
@@ -84,7 +85,8 @@ interface IMYTStrategy {
             uint256 cap,
             uint256 globalCap,
             uint256 estimatedYield,
-            bool additionalIncentives
+            bool additionalIncentives,
+            uint256 slippageBPS
         );
 
     function getCap() external view returns (uint256);
@@ -93,4 +95,5 @@ interface IMYTStrategy {
     function getIdData() external view returns (bytes memory);
     function ids() external view returns (bytes32[] memory);
     function adapterId() external view returns (bytes32);
+    function previewAdjustedWithdraw(uint256 amount) external view returns (uint256);
 }

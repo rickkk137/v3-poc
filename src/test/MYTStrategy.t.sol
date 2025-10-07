@@ -69,7 +69,8 @@ contract MYTStrategyTest is Test {
         cap: 1000e18,
         globalCap: 5000e18,
         estimatedYield: 100e18,
-        additionalIncentives: false
+        additionalIncentives: false,
+        slippageBPS: 1
     });
 
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
@@ -253,7 +254,8 @@ contract MYTStrategyTest is Test {
             uint256 cap,
             uint256 globalCap,
             uint256 estimatedYield,
-            bool additionalIncentives
+            bool additionalIncentives,
+            uint256 slippageBPS
         ) = strategy.params();
         assertEq(uint8(riskClass), uint8(IMYTStrategy.RiskClass.HIGH));
         assertEq(additionalIncentives, true);

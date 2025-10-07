@@ -36,7 +36,8 @@ contract SfrxETHStrategyTest is Test {
             cap: 100 ether,
             globalCap: 100 ether,
             estimatedYield: 100 ether,
-            additionalIncentives: false
+            additionalIncentives: false,
+            slippageBPS: 1
         });
         address permit2Address = 0x000000000022d473030f1dF7Fa9381e04776c7c5; // Mainnet Permit2
         mytStrategy = new MockSfrxETHStrategy(address(vault), params, sfrxEth, fraxMinter, redemptionQueue, permit2Address);
