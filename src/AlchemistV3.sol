@@ -1274,17 +1274,19 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     // Math helpers for Q128.128
     function _mulQ128(uint256 aQ, uint256 bQ) private pure returns (uint256 z) {
         if (aQ == 0 || bQ == 0) return 0;
-        uint256 lo;
-        uint256 hi;
+        uint256 lo; uint256 hi;
         assembly {
             // 512-bit product [hi lo] = aQ * bQ
             let mm := mulmod(aQ, bQ, not(0))
             lo := mul(aQ, bQ)
             hi := sub(sub(mm, lo), lt(mm, lo))
         }
-        // Right shift the 512-bit product by 128 bits:
-        // (hi << 128) | (lo >> 128)  == floor( (aQ * bQ) / 2^128 )
+        // floor((a*b) / 2^128)
         z = (hi << 128) | (lo >> 128);
+        // if there are non-zero low bits, round up
+        if (lo & ((uint256(1) << 128) - 1) != 0) {
+            unchecked { z += 1; }
+        }
     }
 
     function _divQ128(uint256 numerQ128, uint256 denomQ128) private pure returns (uint256) {

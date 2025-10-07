@@ -90,4 +90,7 @@ contract FullSystemInvariantsTest is InvariantBaseTest {
     }
 
     // Earmarked can never be more than total debt
+    function invariantEarmarkedLessThanTotalDebt() public view {
+        assertLe(alchemist.cumulativeEarmarked(), alchemist.totalDebt());
+    }
 }
