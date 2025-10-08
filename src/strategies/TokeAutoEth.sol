@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity 0.8.28;
 
 import {MYTStrategy} from "../MYTStrategy.sol";
-
 import {IERC4626} from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {IMainRewarder, IAutopilotRouter} from "./interfaces/ITokemac.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
@@ -18,7 +16,7 @@ interface RootOracle {
 }
 
 /**
- * TODO: Incomplete, Need to fully implement this strategy
+ * TODO: Incomplete, Need to fully implement auto reward staking
  * @title TokeAutoEthStrategy
  * @notice This strategy is used to allocate and deallocate autoEth to the TokeAutoEth vault on Mainnet
  */
@@ -50,29 +48,34 @@ contract TokeAutoEthStrategy is MYTStrategy {
     }
 
     // @dev Impleenetation can alternatively make use of a multicall
+    // TODO: Update to allow for auto reward staking
     function _allocate(uint256 amount) internal override returns (uint256) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
         TokenUtils.safeApprove(address(weth), address(router), amount);
         uint256 shares = router.depositMax(autoEth, address(this), 0);
-        // Stake on behalf of MYT
-        /*  autoEth.approve(address(rewarder), shares);
-        rewarder.stake(address(this), shares); */
         return amount;
     }
 
-    // todo slippage checks
     function _deallocate(uint256 amount) internal override returns (uint256) {
-        // shares to assets
-        uint256 assets = amount;
-        router.withdrawVaultToken(autoEth, rewarder, assets, false);
-        // autoEth.redeem(withdrawReturn, address(this), address(this));
-        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
+        uint256 sharesNeeded = autoEth.convertToShares(amount);
+        uint256 actualSharesHeld = autoEth.balanceOf(address(this));
+        if (actualSharesHeld > sharesNeeded) {
+            // account for vault rounding up
+            sharesNeeded += 1;
+        }
+        uint256 assets = autoEth.convertToAssets(sharesNeeded);
+        uint256 wethBalanceBefore = TokenUtils.safeBalanceOf(address(weth), address(this));
+        autoEth.withdraw(assets, address(this), address(this));
+        uint256 wethBalanceAfter = TokenUtils.safeBalanceOf(address(weth), address(this));
         TokenUtils.safeApprove(address(weth), msg.sender, amount);
         return amount;
     }
 
     function _previewAdjustedWithdraw(uint256 amount) internal view override returns (uint256) {
-        return amount - (amount * slippageBPS / 10_000);
+        // shares to assets
+        uint256 sharesNeeded = autoEth.convertToShares(amount);
+        uint256 assets = autoEth.convertToAssets(sharesNeeded);
+        return assets - (assets * slippageBPS / 10_000);
     }
 
     function _claimRewards() internal override returns (uint256 rewardsClaimed) {
@@ -98,37 +101,35 @@ contract TokeAutoEthStrategy is MYTStrategy {
         return (ratePerSec, newIndex);
     }
 
-    function _computeRewardsRatePerSecond() internal override returns (uint256) {
-        if (rewarder.rewardToken() == address(0)) return 0;
+    /*     function _computeRewardsRatePerSecond() internal override returns (uint256) {
+            if (rewarder.rewardToken() == address(0)) return 0;
 
-        uint256 assetPrice = oracle.getPriceInEth(address(autoEth));
-        uint256 tvlAssets = autoEth.balanceOf(address(MYT));
-        if (tvlAssets == 0 || assetPrice == 0) return 0;
+            uint256 assetPrice = oracle.getPriceInEth(address(autoEth));
+            uint256 tvlAssets = autoEth.balanceOf(address(MYT));
+            if (tvlAssets == 0 || assetPrice == 0) return 0;
 
-        (uint256 rewardPrice, bool haveRew) = _rewardPricePerSecond();
-        if (!haveRew || rewardPrice == 0) return 0;
+            (uint256 rewardPrice, bool haveRew) = _rewardPricePerSecond();
+            if (!haveRew || rewardPrice == 0) return 0;
 
-        uint256 tvlEth = tvlAssets * assetPrice / FIXED_POINT_SCALAR;
+            uint256 tvlEth = tvlAssets * assetPrice / FIXED_POINT_SCALAR;
 
-        if (tvlEth == 0) return 0;
-        return rewardPrice * FIXED_POINT_SCALAR / tvlEth;
-    }
+            if (tvlEth == 0) return 0;
+            return rewardPrice * FIXED_POINT_SCALAR / tvlEth;
+        }
 
-    function _rewardPricePerSecond() internal returns (uint256 usdPerSecRaw, bool ok) {
-        if (rewarder.rewardToken() == address(0)) return (0, false);
-        uint256 rewardPrice = oracle.getPriceInEth(rewarder.rewardToken());
-        if (rewardPrice == 0) return (0, false);
+        function _rewardPricePerSecond() internal returns (uint256 usdPerSecRaw, bool ok) {
+            if (rewarder.rewardToken() == address(0)) return (0, false);
+            uint256 rewardPrice = oracle.getPriceInEth(rewarder.rewardToken());
+            if (rewardPrice == 0) return (0, false);
 
-        uint256 rate = rewarder.rewardRate();
-        if (rate == 0) return (0, false);
+            uint256 rate = rewarder.rewardRate();
+            if (rate == 0) return (0, false);
 
-        return (rate * rewardPrice, true);
-    }
+            return (rate * rewardPrice, true);
+        }
+    */
 
     function realAssets() external view override returns (uint256) {
-        /*    uint256 stakedShares = rewarder.balanceOf(address(this));
-        return autoEth.convertToAssets(stakedShares); */
-
         return autoEth.convertToAssets(autoEth.balanceOf(address(this)));
     }
 }

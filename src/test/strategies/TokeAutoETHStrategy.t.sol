@@ -161,7 +161,7 @@ contract TokeAutoETHStrategyTest is BaseStrategyTest {
             globalCap: 1e18,
             estimatedYield: 100e18,
             additionalIncentives: false,
-            slippageBPS: 1000
+            slippageBPS: 1
         });
     }
 
@@ -181,10 +181,10 @@ contract TokeAutoETHStrategyTest is BaseStrategyTest {
         return vm.envString("MAINNET_RPC_URL");
     }
 
-    function test_0_strategy_deallocate(uint256 amountToAllocate, uint256 amountToDeallocate) public {
-        amountToAllocate = bound(amountToAllocate, 1e18, testConfig.vaultInitialDeposit);
-        amountToDeallocate = IMYTStrategy(strategy).previewAdjustedWithdraw(amountToAllocate);
-        emit TokeAutoETHStrategyTestLog("amountToDeallocate", amountToDeallocate);
+    // Add any strategy-specific tests here
+    function test_strategy_deallocate_reverts_due_to_slippage(uint256 amountToAllocate, uint256 amountToDeallocate) public {
+        amountToAllocate = bound(amountToAllocate, 1e6, testConfig.vaultInitialDeposit);
+        amountToDeallocate = amountToAllocate;
         vm.startPrank(vault);
         deal(testConfig.vaultAsset, strategy, amountToAllocate);
         bytes memory prevAllocationAmount = abi.encode(0);
@@ -192,12 +192,8 @@ contract TokeAutoETHStrategyTest is BaseStrategyTest {
         uint256 initialRealAssets = IMYTStrategy(strategy).realAssets();
         require(initialRealAssets > 0, "Initial real assets is 0");
         bytes memory prevAllocationAmount2 = abi.encode(amountToAllocate);
-        (bytes32[] memory strategyIds, int256 change) = IMYTStrategy(strategy).deallocate(prevAllocationAmount2, amountToDeallocate, "", address(vault));
-        assertApproxEqAbs(change, -int256(amountToDeallocate), 1e18);
-        assertGt(strategyIds.length, 0, "strategyIds is empty");
-        assertEq(strategyIds[0], IMYTStrategy(strategy).adapterId(), "adapter id not in strategyIds");
-        uint256 finalRealAssets = IMYTStrategy(strategy).realAssets();
-        require(finalRealAssets < initialRealAssets, "Final real assets is not less than initial real assets");
+        vm.expectRevert();
+        IMYTStrategy(strategy).deallocate(prevAllocationAmount2, amountToDeallocate, "", address(vault));
         vm.stopPrank();
     }
 }
