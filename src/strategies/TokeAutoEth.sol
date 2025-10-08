@@ -67,6 +67,11 @@ contract TokeAutoEthStrategy is MYTStrategy {
         uint256 wethBalanceBefore = TokenUtils.safeBalanceOf(address(weth), address(this));
         autoEth.withdraw(assets, address(this), address(this));
         uint256 wethBalanceAfter = TokenUtils.safeBalanceOf(address(weth), address(this));
+        uint256 wethRedeemed = wethBalanceAfter - wethBalanceBefore;
+        if (wethRedeemed < amount) {
+            emit StrategyDeallocationLoss("Strategy deallocation loss.", amount, wethRedeemed);
+        }
+        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than the amount needed");
         TokenUtils.safeApprove(address(weth), msg.sender, amount);
         return amount;
     }
