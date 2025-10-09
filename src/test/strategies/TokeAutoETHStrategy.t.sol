@@ -149,8 +149,6 @@ contract TokeAutoETHStrategyTest is BaseStrategyTest {
     address public constant REWARDER = 0x60882D6f70857606Cdd37729ccCe882015d1755E;
     address public constant ORACLE = 0x61F8BE7FD721e80C0249829eaE6f0DAf21bc2CaC;
 
-    event TokeAutoETHStrategyTestLog(string message, uint256 value);
-
     function getStrategyConfig() internal pure override returns (IMYTStrategy.StrategyParams memory) {
         return IMYTStrategy.StrategyParams({
             owner: address(1),

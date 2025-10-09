@@ -15,8 +15,6 @@ contract MorphoYearnOGWETHStrategyTest is BaseStrategyTest {
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public constant MAINNET_PERMIT2 = 0x000000000022d473030f1dF7Fa9381e04776c7c5;
 
-    event YearnOGTestLog(string message, uint256 value);
-
     function getStrategyConfig() internal pure override returns (IMYTStrategy.StrategyParams memory) {
         return IMYTStrategy.StrategyParams({
             owner: address(1),
