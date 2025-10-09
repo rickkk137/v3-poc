@@ -6,6 +6,10 @@ import {IERC4626} from "../../lib/openzeppelin-contracts/contracts/interfaces/IE
 import {IMainRewarder, IAutopilotRouter} from "./interfaces/ITokemac.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
 
+interface IERC4626Like is IERC4626 {
+    function balanceOfActual(address account) external view returns (uint256);
+}
+
 interface WETH {
     function deposit() external payable;
     function withdraw(uint256) external;
@@ -16,12 +20,11 @@ interface RootOracle {
 }
 
 /**
- * TODO: Incomplete, Need to fully implement auto reward staking
  * @title TokeAutoEthStrategy
  * @notice This strategy is used to allocate and deallocate autoEth to the TokeAutoEth vault on Mainnet
  */
 contract TokeAutoEthStrategy is MYTStrategy {
-    IERC4626 public immutable autoEth;
+    IERC4626Like public immutable autoEth;
     IAutopilotRouter public immutable router;
     IMainRewarder public immutable rewarder;
     WETH public immutable weth;
@@ -40,32 +43,38 @@ contract TokeAutoEthStrategy is MYTStrategy {
         address _oracle,
         address _permit2Address
     ) MYTStrategy(_myt, _params, _permit2Address, _autoEth) {
-        autoEth = IERC4626(_autoEth);
+        autoEth = IERC4626Like(_autoEth);
         router = IAutopilotRouter(_router);
         rewarder = IMainRewarder(_rewarder);
         weth = WETH(_weth);
         oracle = RootOracle(_oracle);
     }
 
-    // @dev Impleenetation can alternatively make use of a multicall
-    // TODO: Update to allow for auto reward staking
+    // @dev Implementation can alternatively make use of a multicall
+    // Deposit weth into the autoEth vault, stake the shares in the rewarder
     function _allocate(uint256 amount) internal override returns (uint256) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
         TokenUtils.safeApprove(address(weth), address(router), amount);
         uint256 shares = router.depositMax(autoEth, address(this), 0);
+        TokenUtils.safeApprove(address(autoEth), address(rewarder), shares);
+        rewarder.stake(address(this), shares);
         return amount;
     }
 
+    // Withdraws auto eth shares from the rewarder with any claims
+    // redeems same amount of shares from auto eth vault to weth
     function _deallocate(uint256 amount) internal override returns (uint256) {
         uint256 sharesNeeded = autoEth.convertToShares(amount);
-        uint256 actualSharesHeld = autoEth.balanceOf(address(this));
-        if (actualSharesHeld > sharesNeeded) {
+        uint256 actualSharesHeld = rewarder.balanceOf(address(this));
+        uint256 shareDiff = actualSharesHeld - sharesNeeded;
+        if (shareDiff <= 1e18) {
             // account for vault rounding up
-            sharesNeeded += 1;
+            sharesNeeded = actualSharesHeld;
         }
-        uint256 assets = autoEth.convertToAssets(sharesNeeded);
+        // withdraw shares, claim any rewards
+        rewarder.withdraw(address(this), sharesNeeded, true);
         uint256 wethBalanceBefore = TokenUtils.safeBalanceOf(address(weth), address(this));
-        autoEth.withdraw(assets, address(this), address(this));
+        autoEth.redeem(sharesNeeded, address(this), address(this));
         uint256 wethBalanceAfter = TokenUtils.safeBalanceOf(address(weth), address(this));
         uint256 wethRedeemed = wethBalanceAfter - wethBalanceBefore;
         if (wethRedeemed < amount) {
@@ -77,7 +86,6 @@ contract TokeAutoEthStrategy is MYTStrategy {
     }
 
     function _previewAdjustedWithdraw(uint256 amount) internal view override returns (uint256) {
-        // shares to assets
         uint256 sharesNeeded = autoEth.convertToShares(amount);
         uint256 assets = autoEth.convertToAssets(sharesNeeded);
         return assets - (assets * slippageBPS / 10_000);
@@ -135,6 +143,8 @@ contract TokeAutoEthStrategy is MYTStrategy {
     */
 
     function realAssets() external view override returns (uint256) {
-        return autoEth.convertToAssets(autoEth.balanceOf(address(this)));
+        uint256 shares = rewarder.balanceOf(address(this));
+        uint256 assets = autoEth.convertToAssets(shares);
+        return assets;
     }
 }
