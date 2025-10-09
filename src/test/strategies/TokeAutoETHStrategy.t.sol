@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 // Adjust these imports to your layout
 
-import {TokeAutoEthStrategy} from "src/strategies/TokeAutoEth.sol";
+import {TokeAutoEthStrategy} from "src/strategies/mainnet/TokeAutoEth.sol";
 import {BaseStrategyTest} from "../libraries/BaseStrategyTest.sol";
 import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
 

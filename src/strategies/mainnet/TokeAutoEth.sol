@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {MYTStrategy} from "../MYTStrategy.sol";
-import {IERC4626} from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
-import {IMainRewarder, IAutopilotRouter} from "./interfaces/ITokemac.sol";
-import {TokenUtils} from "../libraries/TokenUtils.sol";
+import {MYTStrategy} from "../../MYTStrategy.sol";
+import {IERC4626} from "../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import {IMainRewarder, IAutopilotRouter} from "../interfaces/ITokemac.sol";
+import {TokenUtils} from "../../libraries/TokenUtils.sol";
 
 interface IERC4626Like is IERC4626 {
     function balanceOfActual(address account) external view returns (uint256);
@@ -22,6 +22,7 @@ interface RootOracle {
 /**
  * @title TokeAutoEthStrategy
  * @notice This strategy is used to allocate and deallocate autoEth to the TokeAutoEth vault on Mainnet
+ * @notice Also stakes all amounts allocated to the shares in the rewarder
  */
 contract TokeAutoEthStrategy is MYTStrategy {
     IERC4626Like public immutable autoEth;
