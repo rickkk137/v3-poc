@@ -5,9 +5,7 @@ import "./interfaces/IAlchemistV3.sol";
 import {ITokenAdapter} from "./interfaces/ITokenAdapter.sol";
 import {ITransmuter} from "./interfaces/ITransmuter.sol";
 import {IAlchemistV3Position} from "./interfaces/IAlchemistV3Position.sol";
-import {IAlchemistETHVault} from "./interfaces/IAlchemistETHVault.sol";
 import {IFeeVault} from "./interfaces/IFeeVault.sol";
-
 import "./libraries/PositionDecay.sol";
 import {TokenUtils} from "./libraries/TokenUtils.sol";
 import {SafeCast} from "./libraries/SafeCast.sol";
@@ -94,9 +92,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     address public underlyingToken;
 
     /// @inheritdoc IAlchemistV3State
-    address public yieldToken;
-
-    /// @inheritdoc IAlchemistV3State
     address public tokenAdapter;
 
     /// @inheritdoc IAlchemistV3State
@@ -132,10 +127,16 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @dev Total yield tokens deposited
     /// This is used to differentiate between tokens deposited into a CDP and balance of the contract
-    uint256 private _yieldTokensDeposited;
+    uint256 private _mytSharesDeposited;
 
     /// @dev User accounts
     mapping(uint256 => Account) private _accounts;
+
+    /// @inheritdoc IAlchemistV3State
+    address public myt;
+
+    /// @dev Historic redemptions
+    mapping(uint256 => RedemptionInfo) private _redemptions;
 
     modifier onlyAdmin() {
         if (msg.sender != admin) {
@@ -168,13 +169,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         debtToken = params.debtToken;
         underlyingToken = params.underlyingToken;
         underlyingConversionFactor = 10 ** (TokenUtils.expectDecimals(params.debtToken) - TokenUtils.expectDecimals(params.underlyingToken));
-        yieldToken = params.yieldToken;
         depositCap = params.depositCap;
         minimumCollateralization = params.minimumCollateralization;
         globalMinimumCollateralization = params.globalMinimumCollateralization;
         collateralizationLowerBound = params.collateralizationLowerBound;
         admin = params.admin;
-        tokenAdapter = params.tokenAdapter;
         transmuter = params.transmuter;
         protocolFee = params.protocolFee;
         protocolFeeReceiver = params.protocolFeeReceiver;
@@ -182,6 +181,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         repaymentFee = params.repaymentFee;
         lastEarmarkBlock = block.number;
         lastRedemptionBlock = block.number;
+        myt = params.myt;
     }
 
     /// @notice Emitted when a new Position NFT is minted.
@@ -233,7 +233,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3AdminActions
     function setDepositCap(uint256 value) external onlyAdmin {
-        _checkArgument(value >= IERC20(yieldToken).balanceOf(address(this)));
+        _checkArgument(value >= IERC20(myt).balanceOf(address(this)));
 
         depositCap = value;
         emit DepositCapUpdated(value);
@@ -330,7 +330,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3State
     function getTotalDeposited() external view returns (uint256) {
-        return IERC20(yieldToken).balanceOf(address(this));
+        return IERC20(myt).balanceOf(address(this));
     }
 
     /// @inheritdoc IAlchemistV3State
@@ -364,7 +364,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(recipient != address(0));
         _checkArgument(amount > 0);
         _checkState(!depositsPaused);
-        _checkState(_yieldTokensDeposited + amount <= depositCap);
+        _checkState(_mytSharesDeposited + amount <= depositCap);
 
         // Only mint a new position if the id is 0
         if (tokenId == 0) {
@@ -377,8 +377,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _accounts[tokenId].collateralBalance += amount;
 
         // Transfer tokens from msg.sender now that the internal storage updates have been committed.
-        TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), amount);
-        _yieldTokensDeposited += amount;
+        TokenUtils.safeTransferFrom(myt, msg.sender, address(this), amount);
+        _mytSharesDeposited += amount;
 
         emit Deposit(amount, tokenId);
 
@@ -404,8 +404,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _validate(tokenId);
 
         // Transfer the yield tokens to msg.sender
-        TokenUtils.safeTransfer(yieldToken, recipient, amount);
-        _yieldTokensDeposited -= amount;
+        TokenUtils.safeTransfer(myt, recipient, amount);
+        _mytSharesDeposited -= amount;
 
         emit Withdraw(amount, tokenId, recipient);
 
@@ -479,8 +479,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Debt is subject to protocol fee similar to redemptions
         _accounts[recipientId].collateralBalance -= convertDebtTokensToYield(credit) * protocolFee / BPS;
-        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, convertDebtTokensToYield(credit) * protocolFee / BPS);
-        _yieldTokensDeposited -= convertDebtTokensToYield(credit) * protocolFee / BPS;
+        TokenUtils.safeTransfer(myt, protocolFeeReceiver, convertDebtTokensToYield(credit) * protocolFee / BPS);
+        _mytSharesDeposited -= convertDebtTokensToYield(credit) * protocolFee / BPS;
 
         // Update the recipient's debt.
         _subDebt(recipientId, credit);
@@ -534,9 +534,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _subDebt(recipientTokenId, credit);
 
         // Transfer the repaid tokens to the transmuter.
-        TokenUtils.safeTransferFrom(yieldToken, msg.sender, transmuter, creditToYield);
-        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, creditToYield * protocolFee / BPS);
-        _yieldTokensDeposited -= creditToYield * protocolFee / BPS;
+        TokenUtils.safeTransferFrom(myt, msg.sender, transmuter, creditToYield);
+        TokenUtils.safeTransfer(myt, protocolFeeReceiver, creditToYield * protocolFee / BPS);
+        _mytSharesDeposited -= creditToYield * protocolFee / BPS;
 
         emit Repay(msg.sender, amount, recipientTokenId, creditToYield);
 
@@ -616,9 +616,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         lastRedemptionBlock = block.number;
 
-        TokenUtils.safeTransfer(yieldToken, transmuter, collRedeemed);
-        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, feeCollateral);
-        _yieldTokensDeposited -= collRedeemed + feeCollateral;
+        _redemptions[block.number] = RedemptionInfo(cumulativeEarmarked, totalDebt, _earmarkWeight);
+
+        TokenUtils.safeTransfer(myt, transmuter, collRedeemed);
+        TokenUtils.safeTransfer(myt, protocolFeeReceiver, feeCollateral);
+        _mytSharesDeposited -= collRedeemed + feeCollateral;
 
         emit Redemption(amount);
     }
@@ -674,17 +676,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3State
     function convertYieldTokensToUnderlying(uint256 amount) public view returns (uint256) {
-        uint8 decimals = TokenUtils.expectDecimals(yieldToken);
-        return (amount * ITokenAdapter(tokenAdapter).price()) / 10 ** decimals;
+        return IVaultV2(myt).convertToAssets(amount);
     }
 
     /// @inheritdoc IAlchemistV3State
     function convertUnderlyingTokensToYield(uint256 amount) public view returns (uint256) {
-        uint8 decimals = TokenUtils.expectDecimals(yieldToken);
-        if (ITokenAdapter(tokenAdapter).price() == 0) {
-            return 0;
-        }
-        return amount * 10 ** decimals / ITokenAdapter(tokenAdapter).price();
+        return IVaultV2(myt).convertToShares(amount);
     }
 
     /// @inheritdoc IAlchemistV3State
@@ -757,12 +754,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (account.collateralBalance > protocolFeeTotal) {
             account.collateralBalance -= protocolFeeTotal;
             // Transfer the protocol fee to the protocol fee receiver
-            TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, protocolFeeTotal);
+            TokenUtils.safeTransfer(myt, protocolFeeReceiver, protocolFeeTotal);
         }
 
         if (creditToYield > 0) {
             // Transfer the repaid tokens from the account to the transmuter.
-            TokenUtils.safeTransfer(yieldToken, address(transmuter), creditToYield);
+            TokenUtils.safeTransfer(myt, address(transmuter), creditToYield);
         }
 
         return creditToYield;
@@ -788,8 +785,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             return (0, 0, 0);
         }
 
-        // In the rare scenario where the price is 0, return 0
-        if (ITokenAdapter(tokenAdapter).price() == 0) {
+        // In the rare scenario where 1 share is worth 0 underlying asset
+        if (IVaultV2(myt).convertToAssets(1e18) == 0) {
             return (0, 0, 0);
         }
 
@@ -810,7 +807,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // If debt is fully cleared, return with only the repaid amount, no liquidation needed, caller receives repayment fee
         if (account.debt == 0) {
             feeInYield = _resolveRepaymentFee(accountId, repaidAmountInYield);
-            TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
+            TokenUtils.safeTransfer(myt, msg.sender, feeInYield);
             return (repaidAmountInYield, feeInYield, 0);
         }
 
@@ -824,14 +821,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         } else {
             // Since only a repayment happened, send repayment fee to caller
             feeInYield = _resolveRepaymentFee(accountId, repaidAmountInYield);
-            TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
+            TokenUtils.safeTransfer(myt, msg.sender, feeInYield);
             return (repaidAmountInYield, feeInYield, 0);
         }
     }
 
     /// @dev Performs the actual liquidation logic when collateralization is below the lower bound
     /// @param accountId The tokenId of the account to to liquidate.
-    /// @param collateralInUnderlying The collateral value of the account in underlying tokens.
+    /// @param collateralInUnderlying The total collateral value of the account in debt tokens.
     /// @param repaidAmountInYield The amount of debt repaid in yield tokens.
     /// @return amountLiquidated The amount of yield tokens liquidated.
     /// @return feeInYield The fee in yield tokens to be sent to the liquidator.
@@ -859,11 +856,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _subDebt(accountId, debtToBurn);
 
         // send liquidation amount - fee to transmuter
-        TokenUtils.safeTransfer(yieldToken, transmuter, amountLiquidated - feeInYield);
+        TokenUtils.safeTransfer(myt, transmuter, amountLiquidated - feeInYield);
 
         // send base fee to liquidator if available
         if (feeInYield > 0 && account.collateralBalance >= feeInYield) {
-            TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
+            TokenUtils.safeTransfer(myt, msg.sender, feeInYield);
         }
 
         // Handle outsourced fee from vault
@@ -1030,7 +1027,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Survival is the amount of earmark that is left after a redemption
         uint256 redemptionSurvivalOld = PositionDecay.SurvivalFromWeight(account.lastAccruedRedemptionWeight);
         if (redemptionSurvivalOld == 0) redemptionSurvivalOld = ONE_Q128;
-        uint256 redemptionSurvivalNew  = PositionDecay.SurvivalFromWeight(_redemptionWeight);
+        uint256 redemptionSurvivalNew = PositionDecay.SurvivalFromWeight(_redemptionWeight);
 
         // Survival during current sync window
         uint256 survivalRatio = _divQ128(redemptionSurvivalNew, redemptionSurvivalOld);
@@ -1083,7 +1080,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (block.number <= lastEarmarkBlock) return;
 
         // Yield the transmuter accumulated since last earmark (cover)
-        uint256 transmuterCurrentBalance = TokenUtils.safeBalanceOf(yieldToken, address(transmuter));
+        uint256 transmuterCurrentBalance = TokenUtils.safeBalanceOf(myt, address(transmuter));
         uint256 transmuterDifference = transmuterCurrentBalance > lastTransmuterTokenBalance ? transmuterCurrentBalance - lastTransmuterTokenBalance : 0;
 
         uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
@@ -1119,20 +1116,17 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @return The amount of debt that the account owned by `owner` will have after an update.
     /// @return The amount of debt which is currently earmarked fro redemption.
     /// @return The amount of collateral that has yet to be redeemed.
-    function _calculateUnrealizedDebt(uint256 tokenId)
-        internal
-        view
-        returns (uint256, uint256, uint256)
-    {
+    function _calculateUnrealizedDebt(uint256 tokenId) internal view returns (uint256, uint256, uint256) {
         Account storage account = _accounts[tokenId];
 
         // Local copies
         uint256 earmarkWeightCopy = _earmarkWeight;
-        uint256 survivalAccumulatorCopy   = _survivalAccumulator;
+        uint256 survivalAccumulatorCopy = _survivalAccumulator;
 
         // Simulate earmark since lastEarmarkBlock
         if (block.number > lastEarmarkBlock) {
-            uint256 transmuterCurrentBalance = TokenUtils.safeBalanceOf(yieldToken, address(transmuter));
+            // Yield the transmuter accumulated since last earmark (cover)
+            uint256 transmuterCurrentBalance = TokenUtils.safeBalanceOf(myt, address(transmuter));
             uint256 transmuterDifference = transmuterCurrentBalance > lastTransmuterTokenBalance ? transmuterCurrentBalance - lastTransmuterTokenBalance : 0;
 
             uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
@@ -1161,7 +1155,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Survival is the amount of earmark that is left after a redemption
         uint256 redemptionSurvivalOld = PositionDecay.SurvivalFromWeight(account.lastAccruedRedemptionWeight);
         if (redemptionSurvivalOld == 0) redemptionSurvivalOld = ONE_Q128;
-        uint256 redemptionSurvivalNew  = PositionDecay.SurvivalFromWeight(_redemptionWeight);
+        uint256 redemptionSurvivalNew = PositionDecay.SurvivalFromWeight(_redemptionWeight);
         // Survival during current sync window
         uint256 survivalRatio = _divQ128(redemptionSurvivalNew, redemptionSurvivalOld);
 
@@ -1176,7 +1170,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Decay snapshot by what was redeemed from last sync until now
         uint256 decayedRedeemed = _mulQ128(account.lastSurvivalAccumulator, survivalRatio);
         // What was added to the survival accumulator in the current sync window
-        uint256 survivalDiff  = survivalAccumulatorCopy > decayedRedeemed ? survivalAccumulatorCopy - decayedRedeemed : 0;
+        uint256 survivalDiff = survivalAccumulatorCopy > decayedRedeemed ? survivalAccumulatorCopy - decayedRedeemed : 0;
 
         // Unwind accumulated earmarked at last sync
         uint256 unredeemedRatio = _divQ128(survivalDiff, earmarkSurvival);
@@ -1217,7 +1211,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @dev Calculates the total value of the alchemist in the underlying token.
     /// @return totalUnderlyingValue The total value of the alchemist in the underlying token.
     function _getTotalUnderlyingValue() internal view returns (uint256 totalUnderlyingValue) {
-        uint256 yieldTokenTVLInUnderlying = convertYieldTokensToUnderlying(_yieldTokensDeposited);
+        uint256 yieldTokenTVLInUnderlying = convertYieldTokensToUnderlying(_mytSharesDeposited);
         totalUnderlyingValue = yieldTokenTVLInUnderlying;
     }
 
@@ -1274,7 +1268,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     // Math helpers for Q128.128
     function _mulQ128(uint256 aQ, uint256 bQ) private pure returns (uint256 z) {
         if (aQ == 0 || bQ == 0) return 0;
-        uint256 lo; uint256 hi;
+        uint256 lo;
+        uint256 hi;
         assembly {
             // 512-bit product [hi lo] = aQ * bQ
             let mm := mulmod(aQ, bQ, not(0))
@@ -1285,7 +1280,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         z = (hi << 128) | (lo >> 128);
         // if there are non-zero low bits, round up
         if (lo & ((uint256(1) << 128) - 1) != 0) {
-            unchecked { z += 1; }
+            unchecked {
+                z += 1;
+            }
         }
     }
 
@@ -1297,8 +1294,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
                 return (numerQ128 << 128) / denomQ128;
             }
             // Slow path: numerQ128 can only be 2^128 here.
-            uint256 q = numerQ128 / denomQ128;               // 0 or 1 in our domain
-            uint256 r = numerQ128 - q * denomQ128;           // remainder
+            uint256 q = numerQ128 / denomQ128; // 0 or 1 in our domain
+            uint256 r = numerQ128 - q * denomQ128; // remainder
             return (q << 128) + ((r << 128) / denomQ128);
         }
     }

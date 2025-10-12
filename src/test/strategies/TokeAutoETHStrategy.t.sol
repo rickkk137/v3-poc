@@ -1,20 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
-
-import "forge-std/Test.sol";
-
 // Adjust these imports to your layout
-import {TokeAutoEthStrategy} from "src/strategies/TokeAutoEth.sol";
-import {IMYTStrategy} from "src/interfaces/IMYTStrategy.sol";
-import {IMainRewarder, IAutopilotRouter} from "src/strategies/interfaces/ITokemac.sol";
-import {IERC4626} from "../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+
+import {TokeAutoEthStrategy} from "src/strategies/mainnet/TokeAutoEth.sol";
+import {BaseStrategyTest} from "../libraries/BaseStrategyTest.sol";
+import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
 
 interface IERC20 {
     function approve(address spender, uint256 amount) external returns (bool);
     function balanceOf(address a) external view returns (uint256);
 }
 
-contract TokeAutoEthStrategyTest is Test {
+/*contract TokeAutoEthStrategyTest is Test {
     // Addresses sourced from environment so you can swap networks/blocks easily
     address public constant AUTOETH = 0x0A2b94F6871c1D7A32Fe58E1ab5e6deA2f114E56;
     address public constant ROUTER = 0x37dD409f5e98aB4f151F4259Ea0CC13e97e8aE21;
@@ -49,10 +46,12 @@ contract TokeAutoEthStrategyTest is Test {
             cap: type(uint256).max,
             globalCap: type(uint256).max,
             estimatedYield: 0,
-            additionalIncentives: false
+            additionalIncentives: false,
+            slippageBPS: 1
         });
 
-        strat = new TokeAutoEthStrategy(MYT, params, AUTOETH, ROUTER, REWARDER, WETH, ORACLE);
+        address permit2Address = 0x000000000022d473030f1dF7Fa9381e04776c7c5; // Mainnet Permit2
+        strat = new TokeAutoEthStrategy(MYT, params, AUTOETH, ROUTER, REWARDER, WETH, ORACLE, permit2Address);
 
         strat.setWhitelistedAllocator(address(0xbeef), true);
 
@@ -96,7 +95,7 @@ contract TokeAutoEthStrategyTest is Test {
 
     // TODO find blocks to test where we actually will acrue rewards
     // Currently earned 0
-    /*function testClaim() public {
+    function testClaim() public {
         uint256 ethAmt = 0.15 ether;
         vm.deal(address(0xbeef), ethAmt);
 
@@ -108,7 +107,7 @@ contract TokeAutoEthStrategyTest is Test {
         vm.rollFork(23281065);
 
         strat.claimRewards();
-    }*/
+    }
 
     function testSnapshotYield() public {
         uint256 ethAmt = 0.2 ether;
@@ -126,5 +125,73 @@ contract TokeAutoEthStrategyTest is Test {
 
         uint256 second = strat.snapshotYield();
         assertGt(second, 0, "APY should be > 0 after moving to later block");
+    }
+}*/
+
+contract MockTokeAutoEthStrategy is TokeAutoEthStrategy {
+    constructor(
+        address _myt,
+        StrategyParams memory _params,
+        address _autoEth,
+        address _router,
+        address _rewarder,
+        address _weth,
+        address _oracle,
+        address _permit2Address
+    ) TokeAutoEthStrategy(_myt, _params, _autoEth, _router, _rewarder, _weth, _oracle, _permit2Address) {}
+}
+
+contract TokeAutoETHStrategyTest is BaseStrategyTest {
+    address public constant TOKE_AUTO_ETH_VAULT = 0x0A2b94F6871c1D7A32Fe58E1ab5e6deA2f114E56;
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public constant MAINNET_PERMIT2 = 0x000000000022d473030f1dF7Fa9381e04776c7c5;
+    address public constant AUTOPILOT_ROUTER = 0x37dD409f5e98aB4f151F4259Ea0CC13e97e8aE21;
+    address public constant REWARDER = 0x60882D6f70857606Cdd37729ccCe882015d1755E;
+    address public constant ORACLE = 0x61F8BE7FD721e80C0249829eaE6f0DAf21bc2CaC;
+
+    function getStrategyConfig() internal pure override returns (IMYTStrategy.StrategyParams memory) {
+        return IMYTStrategy.StrategyParams({
+            owner: address(1),
+            name: "TokeAutoEth",
+            protocol: "TokeAutoEth",
+            riskClass: IMYTStrategy.RiskClass.MEDIUM,
+            cap: 10_000e18,
+            globalCap: 1e18,
+            estimatedYield: 100e18,
+            additionalIncentives: false,
+            slippageBPS: 1
+        });
+    }
+
+    function getTestConfig() internal pure override returns (TestConfig memory) {
+        return TestConfig({vaultAsset: WETH, vaultInitialDeposit: 1000e18, absoluteCap: 10_000e18, relativeCap: 1e18, decimals: 18});
+    }
+
+    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
+        return address(new MockTokeAutoEthStrategy(vault, params, TOKE_AUTO_ETH_VAULT, AUTOPILOT_ROUTER, REWARDER, WETH, ORACLE, MAINNET_PERMIT2));
+    }
+
+    function getForkBlockNumber() internal pure override returns (uint256) {
+        return 22_089_302;
+    }
+
+    function getRpcUrl() internal view override returns (string memory) {
+        return vm.envString("MAINNET_RPC_URL");
+    }
+
+    // Add any strategy-specific tests here
+    function test_strategy_deallocate_reverts_due_to_slippage(uint256 amountToAllocate, uint256 amountToDeallocate) public {
+        amountToAllocate = bound(amountToAllocate, 1e6, testConfig.vaultInitialDeposit);
+        amountToDeallocate = amountToAllocate;
+        vm.startPrank(vault);
+        deal(testConfig.vaultAsset, strategy, amountToAllocate);
+        bytes memory prevAllocationAmount = abi.encode(0);
+        IMYTStrategy(strategy).allocate(prevAllocationAmount, amountToAllocate, "", address(vault));
+        uint256 initialRealAssets = IMYTStrategy(strategy).realAssets();
+        require(initialRealAssets > 0, "Initial real assets is 0");
+        bytes memory prevAllocationAmount2 = abi.encode(amountToAllocate);
+        vm.expectRevert();
+        IMYTStrategy(strategy).deallocate(prevAllocationAmount2, amountToDeallocate, "", address(vault));
+        vm.stopPrank();
     }
 }

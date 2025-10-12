@@ -23,3 +23,6 @@
 [submodule "lib/vault-v2"]
 	path = lib/vault-v2
 	url = https://github.com/morpho-org/vault-v2
+[submodule "lib/v3-periphery"]
+	path = lib/v3-periphery
+	url = https://github.com/UniSwap/v3-periphery

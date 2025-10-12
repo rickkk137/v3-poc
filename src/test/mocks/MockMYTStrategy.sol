@@ -9,12 +9,14 @@ import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
 contract MockMYTStrategy is MYTStrategy {
     IMockYieldToken public immutable token;
 
-    constructor(address _myt, address _token, IMYTStrategy.StrategyParams memory _params) MYTStrategy(_myt, _params) {
+    constructor(address _myt, address _token, IMYTStrategy.StrategyParams memory _params, address _permit2Address)
+        MYTStrategy(_myt, _params, _permit2Address, _token)
+    {
         token = IMockYieldToken(_token);
     }
 
     function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
-        // if native eth used, most strats will have theor own function to wrap eth to weth
+        // if native eth used, most strats will have their own function to wrap eth to weth
         // so will assume that all token deposits are done with weth
         TokenUtils.safeApprove(token.underlyingToken(), address(token), 2 * amount);
         depositReturn = token.deposit(amount);

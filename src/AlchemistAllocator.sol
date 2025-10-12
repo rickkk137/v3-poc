@@ -38,6 +38,11 @@ contract AlchemistAllocator is PermissionedProxy, IAllocator {
         vault.allocate(adapter, oldAllocation, amount);
     }
 
+    /// @notice When deallocating total amounts,
+    /// consider using IMYTStrategy(address(strategy)).previewAdjustedWithdraw(amount)
+    /// as the amount to be passed in for `amount`
+    /// to estimate the correct amount that can be fully withdrawn,
+    /// accounting for losses due to slippage, protocol fees, and rounding differences
     function deallocate(address adapter, uint256 amount) external {
         require(msg.sender == admin || operators[msg.sender], "PD");
         bytes32 id = IMYTStrategy(adapter).adapterId();

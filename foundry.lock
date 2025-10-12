@@ -20,6 +20,12 @@
   "lib/solmate": {
     "rev": "97bdb2003b70382996a79a406813f76417b1cf90"
   },
+  "lib/v3-periphery": {
+    "tag": {
+      "name": "v1.3.0",
+      "rev": "80f26c86c57b8a5e4b913f42844d4c8bd274d058"
+    }
+  },
   "lib/vault-v2": {
     "rev": "275c2f9cbe6d79e8e4712497dc3cb51cc70f786f"
   }

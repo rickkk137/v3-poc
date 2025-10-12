@@ -9,8 +9,6 @@ struct AlchemistInitializationParams {
     address debtToken;
     // The ERC20 token used to represent the underlying token of the yield token.
     address underlyingToken;
-    // The address(es) of the yield token(s) being deposited.
-    address yieldToken;
     // The global maximum amount of deposited collateral.
     uint256 depositCap;
     // The minimum collateralization between 0 and 1 exclusive
@@ -19,8 +17,6 @@ struct AlchemistInitializationParams {
     uint256 globalMinimumCollateralization;
     // The minimum collateralization for liquidation eligibility. between 1 and minimumCollateralization inclusive.
     uint256 collateralizationLowerBound;
-    // Token adapter used to get price for yiel tokens.
-    address tokenAdapter;
     // The initial transmuter or transmuter buffer.
     address transmuter;
     // The fee on user debt paid to the protocol.
@@ -31,6 +27,8 @@ struct AlchemistInitializationParams {
     uint256 liquidatorFee;
     // Fee paid to liquidators forcing an account earmarked debt repayment.
     uint256 repaymentFee;
+    // The address of the morpho v2 vault.
+    address myt;
 }
 
 /// @notice A user account.
@@ -58,7 +56,6 @@ struct Account {
     mapping(uint256 => mapping(address => uint256)) mintAllowances;
     /// @notice id used in the mintAllowances map which is incremented on reset.
     uint256 allowancesVersion;
-
     uint256 lastSurvivalAccumulator;
 }
 
@@ -635,7 +632,7 @@ interface IAlchemistV3State {
 
     function underlyingToken() external view returns (address token);
 
-    function yieldToken() external view returns (address token);
+    function myt() external view returns (address token);
 
     function depositsPaused() external view returns (bool isPaused);
 

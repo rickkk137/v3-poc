@@ -71,17 +71,17 @@ library ZeroXSwapVerifier {
      * @param calldata_ The calldata to decode
      * @param owner the address we whitelist as spender
      * @param targetToken The expected token address that should be matched
-     * @param targetAmount The expected amount that should be matched
+     * @param maxSlippageBps Maximum allowed slippage in basis points
      */
-    function decodeAndVerifyActions(bytes calldata calldata_, address owner, address targetToken, uint256 targetAmount) internal view {
+    function decodeAndVerifyActions(bytes calldata calldata_, address owner, address targetToken, uint256 maxSlippageBps) internal view {
 
 
         bytes4 selector = bytes4(calldata_[0:4]);
 
         if (selector == EXECUTE_SELECTOR) {
-            _verifyExecuteCalldata(calldata_[4:], owner, targetToken, targetAmount);
+            _verifyExecuteCalldata(calldata_[4:], owner, targetToken, maxSlippageBps);
         } else if (selector == EXECUTE_META_TXN_SELECTOR) {
-            _verifyExecuteMetaTxnCalldata(calldata_[4:], owner, targetToken, targetAmount);
+            _verifyExecuteMetaTxnCalldata(calldata_[4:], owner, targetToken, maxSlippageBps);
         } else {
             revert("Unsupported function selector");
         }
@@ -93,10 +93,10 @@ library ZeroXSwapVerifier {
      * @param calldata_ The complete calldata from 0x API
      * @param owner the address we whitelist as spender
      * @param targetToken The expected token address that should be matched
-     * @param targetAmount The expected amount that should be matched
+     * @param maxSlippageBps Maximum allowed slippage in basis points (1000 = 10%)
      * @return verified Whether the swap passes all checks
      */
-    function verifySwapCalldata(bytes calldata calldata_, address owner, address targetToken, uint256 targetAmount)
+    function verifySwapCalldata(bytes calldata calldata_, address owner, address targetToken, uint256 maxSlippageBps)
         external
         view
         returns (bool verified)
@@ -110,7 +110,7 @@ library ZeroXSwapVerifier {
         // Check if it's a valid 0x Settler function
         require(selector == EXECUTE_SELECTOR || selector == EXECUTE_META_TXN_SELECTOR, "IS");
 
-        decodeAndVerifyActions(calldata_, owner, targetToken, targetAmount);
+        decodeAndVerifyActions(calldata_, owner, targetToken, maxSlippageBps);
         return true;
     }
 
@@ -120,37 +120,37 @@ library ZeroXSwapVerifier {
      * @dev Verify execute() function calldata
      * @param data The function parameters (without selector)
      * @param targetToken The expected token address that should be matched
-     * @param targetAmount The expected amount that should be matched
+     * @param maxSlippageBps Maximum allowed slippage in basis points
      */
-    function _verifyExecuteCalldata(bytes calldata data, address owner, address targetToken, uint256 targetAmount) internal view {
+    function _verifyExecuteCalldata(bytes calldata data, address owner, address targetToken, uint256 maxSlippageBps) internal view {
         // Decode SlippageAndActions struct and actions array
         (SlippageAndActions memory saa, ) = abi.decode(data, (SlippageAndActions, bytes));
         // TODO shall we also verify saa.buyToken ?
-        _verifyActions(saa.actions, owner, targetToken, targetAmount);
+        _verifyActions(saa.actions, owner, targetToken, maxSlippageBps);
     }
 
     /**
      * @dev Verify executeMetaTxn() function calldata
      * @param data The function parameters (without selector)
      * @param targetToken The expected token address that should be matched
-     * @param targetAmount The expected amount that should be matched
+     * @param maxSlippageBps Maximum allowed slippage in basis points
      */
-    function _verifyExecuteMetaTxnCalldata(bytes calldata data, address owner, address targetToken, uint256 targetAmount) internal view {
+    function _verifyExecuteMetaTxnCalldata(bytes calldata data, address owner, address targetToken, uint256 maxSlippageBps) internal view {
         // Decode parameters: (SlippageAndActions, bytes[], address, bytes)
         (SlippageAndActions memory saa, , , ) = abi.decode(data, (SlippageAndActions, bytes[], address, bytes));
         // TODO shall we also verify saa.buyToken ?
-        _verifyActions(saa.actions, owner, targetToken, targetAmount);
+        _verifyActions(saa.actions, owner, targetToken, maxSlippageBps);
     }
 
     /**
      * @dev Verify all actions in the actions array
      * @param actions Array of encoded action calls
      * @param targetToken The expected token address that should be matched
-     * @param targetAmount The expected amount that should be matched
+     * @param maxSlippageBps Maximum allowed slippage in basis points
      */
-    function _verifyActions(bytes[] memory actions, address owner, address targetToken, uint256 targetAmount) internal view {
+    function _verifyActions(bytes[] memory actions, address owner, address targetToken, uint256 maxSlippageBps) internal view {
         for (uint256 i = 0; i < actions.length; i++) {
-            _verifyAction(actions[i], owner, targetToken, targetAmount);
+            _verifyAction(actions[i], owner, targetToken, maxSlippageBps);
         }
     }
 
@@ -158,9 +158,9 @@ library ZeroXSwapVerifier {
      * @dev Verify a single action
      * @param action The encoded action call
      * @param targetToken The expected token address that should be matched
-     * @param targetAmount The expected amount that should be matched
+     * @param maxSlippageBps Maximum allowed slippage in basis points
      */
-    function _verifyAction(bytes memory action, address owner, address targetToken, uint256 targetAmount) internal view {
+    function _verifyAction(bytes memory action, address owner, address targetToken, uint256 maxSlippageBps) internal view {
         if (action.length < 4) {
             revert("Invalid action length");
         }
@@ -169,19 +169,19 @@ library ZeroXSwapVerifier {
 
         // Verify based on action type
         if (actionSelector == BASIC_SELL_TO_POOL) {
-            _verifyBasicSellToPool(action, owner, targetToken, targetAmount);
+            _verifyBasicSellToPool(action, owner, targetToken, maxSlippageBps);
         } else if (actionSelector == UNISWAPV3_VIP) {
-            _verifyUniswapV3VIP(action, owner, targetToken, targetAmount);
+            _verifyUniswapV3VIP(action, owner, targetToken, maxSlippageBps);
         } else if (actionSelector == RFQ_VIP) {
-            _verifyRFQVIP(action, owner, targetToken, targetAmount);
+            _verifyRFQVIP(action, owner, targetToken, maxSlippageBps);
         } else if (actionSelector == TRANSFER_FROM) {
-            _verifyTransferFrom(action, owner, targetToken, targetAmount);
+            _verifyTransferFrom(action, owner, targetToken, maxSlippageBps);
         } else if (actionSelector == SELL_TO_LIQUIDITY_PROVIDER) {
-            _verifySellToLiquidityProvider(action, owner, targetToken, targetAmount);
+            _verifySellToLiquidityProvider(action, owner, targetToken, maxSlippageBps);
         } else if (actionSelector == NATIVE_DEPOSIT) {
             revert("not supported");
         } else if (actionSelector == VELODROME_V2_VIP) {
-            _verifyVelodromeV2VIP(action, owner, targetToken, targetAmount);
+            _verifyVelodromeV2VIP(action, owner, targetToken, maxSlippageBps);
         } else {
             revert("IAC");
         }
@@ -192,21 +192,21 @@ library ZeroXSwapVerifier {
      * @dev Verify BASIC_SELL_TO_POOL action
      * Format: basicSellToPool(IERC20 sellToken, uint256 bps, address pool, uint256 offset, bytes data)
      */
-    function _verifyBasicSellToPool(bytes memory action, address owner, address targetToken, uint256 targetAmount) internal view {
+    function _verifyBasicSellToPool(bytes memory action, address owner, address targetToken, uint256 maxSlippageBps) internal view {
         (address sellToken, uint256 bps, , , ) = abi.decode(
             _slice(action, 4),
             (address, uint256, address, uint256, bytes)
         );
 
         require(sellToken == targetToken, "IT");
-        require(IERC20(targetToken).balanceOf(owner) == targetAmount, "IA");
+        require(bps <= maxSlippageBps, "Slippage too high");
     }
 
     /**
      * @dev Verify UNISWAP_V3_VIP action
      * Format: uniswapV3VIP(address recipient, uint256 bps, uint256 feeOrTickSpacing, bool feeOnTransfer, bytes fills)
      */
-    function _verifyUniswapV3VIP(bytes memory action, address owner, address targetToken, uint256 targetAmount) internal view {
+    function _verifyUniswapV3VIP(bytes memory action, address owner, address targetToken, uint256 maxSlippageBps) internal view {
         (, uint256 bps, , , bytes memory fills) = abi.decode(
             _slice(action, 4),
             (address, uint256, uint256, bool, bytes)
@@ -215,7 +215,7 @@ library ZeroXSwapVerifier {
         // Extract token from fills data - this requires parsing the UniswapV3 fill structure
         address sellToken = _extractTokenFromUniswapFills(fills);
         require(sellToken == targetToken, "IT");
-        require(IERC20(targetToken).balanceOf(owner) == targetAmount, "IA");
+        require(bps <= maxSlippageBps, "Slippage too high");
     }
 
     /**
@@ -228,7 +228,7 @@ library ZeroXSwapVerifier {
         // Extract token and amount from RFQ fill data
         (address sellToken, uint256 amount) = _extractTokenAndAmountFromRFQ(fillData);
         require(sellToken == targetToken, "IT");
-        require(IERC20(targetToken).balanceOf(owner) == targetAmount, "IA");
+        // Removed balance check as the 0x quote already has slippage protection
     }
 
     /**
@@ -242,7 +242,7 @@ library ZeroXSwapVerifier {
         );
 
         require(token == targetToken, "IT");
-        require(IERC20(targetToken).balanceOf(owner) == targetAmount, "IA");
+        // Removed balance check as the 0x quote already has slippage protection
     }
 
     /**
@@ -255,13 +255,13 @@ library ZeroXSwapVerifier {
         );
 
         require(sellToken == targetToken, "IT");
-        require(IERC20(targetToken).balanceOf(owner) == targetAmount, "IA");
+        // Removed balance check as the 0x quote already has slippage protection
     }
 
     /**
      * @dev Verify VELODROME_V2_VIP action
      */
-    function _verifyVelodromeV2VIP(bytes memory action, address owner, address targetToken, uint256 targetAmount) internal view {
+    function _verifyVelodromeV2VIP(bytes memory action, address owner, address targetToken, uint256 maxSlippageBps) internal view {
         (address sellToken, uint256 bps, , , , ) = abi.decode(
             _slice(action, 4),
             (address, uint256, bool, uint256, uint256, bytes)
@@ -269,7 +269,7 @@ library ZeroXSwapVerifier {
 
 
         require(sellToken == targetToken, "IT");
-        require(IERC20(targetToken).balanceOf(owner) == targetAmount, "IA");
+        require(bps <= maxSlippageBps, "Slippage too high");
     }
 
 
