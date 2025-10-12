@@ -20,12 +20,19 @@ interface IDeployerTiny is IERC721Tiny {
     function prev(uint128 featureId) external view returns (address);
 }
 
+// Interface for Permit2 to support ERC-1271 signature verification
+interface IPermit2 {
+    function isValidSignature(bytes32 hash, bytes memory signature) external view returns (bytes4);
+}
+
 contract MYTStrategy is IMYTStrategy, Ownable {
     IVaultV2 public immutable MYT;
+    address public immutable receiptToken;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
+    uint256 public constant MIN_SNAPSHOT_INTERVAL = 1 days;
 
-    StrategyParams public params;
+    IMYTStrategy.StrategyParams public params;
     bytes32 public immutable adapterId;
     uint256 public lastSnapshotTime;
     uint256 public lastIndex;
@@ -39,11 +46,17 @@ contract MYTStrategy is IMYTStrategy, Ownable {
 
     mapping(address => bool) public whitelistedAllocators;
 
+    // Permit2 configuration
+    address public permit2Address;
+
+    // recommended slippage for the strategy. should include this in any call to MorphoVaultV2.deallocate
+    uint256 public slippageBPS;
     IDeployerTiny constant ZERO_EX_DEPLOYER = IDeployerTiny(0x00000000000004533Fe15556B1E086BB1A72cEae);
 
     error CounterfeitSettler(address);
 
-    event MYTLog(string message, uint256 value);
+    event StrategyDeallocationLoss(string message, uint256 amountRequested, uint256 actualAmountSent);
+    event StrategyAllocationLoss(string message, uint256 amountRequested, uint256 actualAmountReceived);
 
     /// @notice Modifier to restrict access to the vault **managed** by the MYT contract
     modifier onlyVault() {
@@ -51,12 +64,24 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         _;
     }
 
-    constructor(address _myt, StrategyParams memory _params) Ownable(_params.owner) {
+    constructor(address _myt, StrategyParams memory _params, address _permit2Address, address _receiptToken) Ownable(_params.owner) {
         require(_params.owner != address(0));
         require(_myt != address(0));
+        require(_permit2Address != address(0), "Zero Permit2 address");
+        require(_receiptToken != address(0), "Zero receipt token address");
         MYT = IVaultV2(_myt);
+        receiptToken = _receiptToken;
         params = _params;
-        adapterId = keccak256(abi.encode(_params.protocol, address(this)));
+        adapterId = keccak256(abi.encode(_params.protocol));
+        slippageBPS = _params.slippageBPS;
+
+        permit2Address = _permit2Address;
+
+        // IERC20 vaultAsset = IERC20(address(MYT.asset()));
+        // vaultAsset.approve(permit2Address, type(uint256).max);
+        IERC20 receiptTokenContract = IERC20(receiptToken);
+        receiptTokenContract.approve(permit2Address, type(uint256).max);
+
         // TODO add the strategy to the perpetual gauge in an authenticated manner
         // TODO perhap take initial snapshot now to set up start block
     }
@@ -66,6 +91,10 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         onlyVault
         returns (bytes32[] memory strategyIds, int256 change)
     {
+        if (killSwitch) {
+            return (ids(), int256(0));
+        }
+        require(assets > 0, "Zero amount");
         uint256 oldAllocation = abi.decode(data, (uint256));
         uint256 amountAllocated = _allocate(assets);
         uint256 newAllocation = oldAllocation + amountAllocated;
@@ -78,28 +107,36 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         onlyVault
         returns (bytes32[] memory strategyIds, int256 change)
     {
+        if (killSwitch) {
+            return (ids(), int256(0));
+        }
+        require(assets > 0, "Zero amount");
         uint256 oldAllocation = abi.decode(data, (uint256));
-        emit MYTLog("oldAllocation", oldAllocation);
         uint256 amountDeallocated = _deallocate(assets);
-        emit MYTLog("amountDeallocated", amountDeallocated);
-
         uint256 newAllocation = oldAllocation - amountDeallocated;
-        emit MYTLog("newAllocation", newAllocation);
         emit Deallocate(amountDeallocated, address(this));
         return (ids(), int256(newAllocation) - int256(oldAllocation));
+    }
+
+    function previewAdjustedWithdraw(uint256 amount) external view returns (uint256) {
+        require(amount > 0, "Zero amount");
+        return _previewAdjustedWithdraw(amount);
     }
 
     /// @notice call this function to handle unwrapping/deallocation/moving funds from
     /// the respective protocol of this strategy in case we want to bypass
     /// a withdrawal queue or similar mechanism and directly go to a DEX
     function deallocateDex(bytes calldata quote, bool prevSettler) external returns (uint256 ret) {
-        IERC20 asset = IERC20(address(MYT.asset()));
+        require(!killSwitch, "emergency");
+        IERC20 asset = IERC20(receiptToken);
         // TODO additional access control needed?
         require(whitelistedAllocators[msg.sender], "PD");
         address currentSettler = prevSettler ? ZERO_EX_DEPLOYER.prev(2) : ZERO_EX_DEPLOYER.ownerOf(2);
         uint256 balanceBefore = asset.balanceOf(address(this));
-        uint256 limit = balanceBefore * 10 / 100; // 10% of balance
-        require(ZeroXSwapVerifier.verifySwapCalldata(quote, address(this), address(MYT.asset()), limit));
+
+        // Set maximum allowed slippage to 10% (1000 bps)
+        uint256 maxSlippageBps = 1000;
+        require(ZeroXSwapVerifier.verifySwapCalldata(quote, address(this), receiptToken, maxSlippageBps));
 
         (bool success,) = currentSettler.call(quote);
         require(success, "SF"); // settler failed
@@ -110,22 +147,36 @@ contract MYTStrategy is IMYTStrategy, Ownable {
 
     /// @notice call this function to handle strategies with withdrawal queue NFT
     function claimWithdrawalQueue(uint256 positionId) public virtual returns (uint256 ret) {
+        require(whitelistedAllocators[msg.sender], "PD");
+        require(!killSwitch, "emergency");
         _claimWithdrawalQueue(positionId);
     }
 
     /// @notice call this function to claim all available rewards from the respective
     /// protocol of this strategy
     function claimRewards() public virtual returns (uint256) {
+        require(!killSwitch, "emergency");
         _claimRewards();
     }
 
     /// @dev override this function to handle wrapping/allocation/moving funds to
     /// the respective protocol of this strategy
+    /// @notice uint56 amount returned must be equal to the amount parameter passed in
     function _allocate(uint256 amount) internal virtual returns (uint256) {}
 
     /// @dev override this function to handle unwrapping/deallocation/moving funds from
     /// the respective protocol of this strategy
+    /// @notice uint56 amount returned must be equal to the amount parameter passed in
+    /// @notice due to how MorphoVaultV2 internally handles deallocations,
+    /// strategies must have atleast >= amount available at the end of this function call
+    /// if not, the strategy will revert
+    /// @notice amount of asset must be approved to the vault (i.e. msg.sender)
     function _deallocate(uint256 amount) internal virtual returns (uint256) {}
+
+    /// @dev override this function to handle preview withdraw with slippage
+    /// @notice this function should be used to estimate the correct amount that can be fully withdrawn, accounting for losses
+    /// due to slippage, protocol fees, and rounding differences
+    function _previewAdjustedWithdraw(uint256 amount) internal view virtual returns (uint256) {}
 
     /// @dev override this function to handle strategies with withdrawal queue NFT
     function _claimWithdrawalQueue(uint256 positionId) internal virtual returns (uint256) {}
@@ -140,10 +191,9 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     function snapshotYield() public virtual returns (uint256) {
         uint256 currentTime = block.timestamp;
 
-        // todo decide to implement this
-        // if (lastSnapshotTime != 0 && currentTime - lastSnapshotTime < MIN_SNAPSHOT_INTERVAL) {
-        //     return estApy;
-        // }
+        if (lastSnapshotTime != 0 && currentTime - lastSnapshotTime < MIN_SNAPSHOT_INTERVAL) {
+            return estApy;
+        }
 
         // Base rate of strategy
         (uint256 baseRatePerSec, uint256 newIndex) = _computeBaseRatePerSecond();
@@ -217,6 +267,22 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         emit Emergency(val);
     }
 
+    /// @notice update Permit2 address and approvals
+    function setPermit2Address(address newAddress) public onlyOwner {
+        require(newAddress != address(0), "Zero address");
+
+        // Revoke old approvals
+        // IERC20 vaultAsset = IERC20(address(MYT.asset()));
+        // vaultAsset.approve(permit2Address, 0);
+        IERC20 receiptTokenContract = IERC20(receiptToken);
+        receiptTokenContract.approve(permit2Address, 0);
+
+        // Set new approvals
+        //vaultAsset.approve(newAddress, type(uint256).max);
+        receiptTokenContract.approve(newAddress, type(uint256).max);
+        permit2Address = newAddress;
+    }
+
     /// @notice get the current snapshotted estimated yield for this strategy.
     /// This call does not guarantee the latest up-to-date yield and there might
     /// be discrepancies from the respective protocols numbers.
@@ -239,8 +305,13 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     }
 
     function getIdData() external view returns (bytes memory) {
-        return abi.encode(params.protocol, address(this));
+        return abi.encode(params.protocol);
     }
 
     function realAssets() external view virtual returns (uint256) {}
+
+    /// @notice ERC-1271 interface for Permit2 signature verification
+    function isValidSignature(bytes32 _hash, bytes memory _signature) public view returns (bytes4) {
+        return IPermit2(permit2Address).isValidSignature(_hash, _signature);
+    }
 }

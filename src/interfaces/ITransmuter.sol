@@ -50,10 +50,6 @@ interface ITransmuter {
     /// @notice This is for users who choose to pull from the transmuter before their position has fully matured.
     function exitFee() external view returns (uint256 fee);
 
-    /// @notice Returns the size in blocks of the transmuter staking graph.
-    /// @notice This is used to optimize the amount of reads and writes made to the graph and can be extended over time.
-    function graphSize() external view returns (uint256 size);
-
     /// @notice Returns the transmutation fee.
     /// @notice This fee affects all claims.
     function transmutationFee() external view returns (uint256 fee);

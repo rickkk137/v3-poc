@@ -2,25 +2,25 @@
 pragma solidity 0.8.28;
 
 import "../libraries/BaseStrategyTest.sol";
-import {PeapodsETHStrategy} from "../../strategies/mainnet/PeapodsETH.sol";
+import {MoonwellWETHStrategy} from "../../strategies/optimism/MoonwellWETHStrategy.sol";
 
-contract MockPeapodsETHStrategy is PeapodsETHStrategy {
-    constructor(address _myt, StrategyParams memory _params, address _vault, address _weth, address _permit2Address)
-        PeapodsETHStrategy(_myt, _params, _vault, _weth, _permit2Address)
+contract MockMoonwellWETHStrategy is MoonwellWETHStrategy {
+    constructor(address _myt, StrategyParams memory _params, address _mWETH, address _weth, address _permit2Address)
+        MoonwellWETHStrategy(_myt, _params, _mWETH, _weth, _permit2Address)
     {}
 }
 
-contract PeapodsETHStrategyTest is BaseStrategyTest {
-    address public constant PEAPODS_ETH_VAULT = 0x9a42e1bEA03154c758BeC4866ec5AD214D4F2191;
-    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public constant MAINNET_PERMIT2 = 0x000000000022d473030f1dF7Fa9381e04776c7c5;
+contract MoonwellWETHStrategyTest is BaseStrategyTest {
+    address public constant MOONWELL_WETH_MTOKEN = 0xb4104C02BBf4E9be85AAa41a62974E4e28D59A33;
+    address public constant WETH = 0x4200000000000000000000000000000000000006;
+    address public constant OPTIMISM_PERMIT2 = 0x000000000022d473030f1dF7Fa9381e04776c7c5;
 
     function getStrategyConfig() internal pure override returns (IMYTStrategy.StrategyParams memory) {
         return IMYTStrategy.StrategyParams({
             owner: address(1),
-            name: "PeapodsETH",
-            protocol: "PeapodsETH",
-            riskClass: IMYTStrategy.RiskClass.HIGH,
+            name: "MoonwellWETH",
+            protocol: "MoonwellWETH",
+            riskClass: IMYTStrategy.RiskClass.LOW,
             cap: 10_000e18,
             globalCap: 1e18,
             estimatedYield: 100e18,
@@ -33,16 +33,16 @@ contract PeapodsETHStrategyTest is BaseStrategyTest {
         return TestConfig({vaultAsset: WETH, vaultInitialDeposit: 1000e18, absoluteCap: 10_000e18, relativeCap: 1e18, decimals: 18});
     }
 
-    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
-        return address(new MockPeapodsETHStrategy(vault, params, PEAPODS_ETH_VAULT, WETH, MAINNET_PERMIT2));
+    function createStrategy(address myt, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
+        return address(new MockMoonwellWETHStrategy(myt, params, MOONWELL_WETH_MTOKEN, WETH, OPTIMISM_PERMIT2));
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {
-        return 0;
+        return 141_751_698;
     }
 
     function getRpcUrl() internal view override returns (string memory) {
-        return vm.envString("MAINNET_RPC_URL");
+        return vm.envString("OPTIMISM_RPC_URL");
     }
 
     // Add any strategy-specific tests here

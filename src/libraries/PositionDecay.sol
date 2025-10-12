@@ -88,7 +88,7 @@ library PositionDecay {
       // First weight will b 0 which needs to return 1
       // The Exp2NegFrac function cannot handle 0 this way so we hardcode the return
       if (weight == 0) {
-        return uint256(1) << 128; // ✅ UQ128.128 for 1.0
+        return uint256(1) << 128;
       }
 
       return Exp2NegFrac(weight);

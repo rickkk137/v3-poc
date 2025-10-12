@@ -1,44 +1,53 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
+// Adjust these imports to your layout
 
-import "../libraries/BaseStrategyTest.sol";
-import {PeapodsETHStrategy} from "../../strategies/mainnet/PeapodsETH.sol";
+import {TokeAutoUSDStrategy} from "src/strategies/mainnet/TokeAutoUSDStrategy.sol";
+import {BaseStrategyTest} from "../libraries/BaseStrategyTest.sol";
+import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
 
-contract MockPeapodsETHStrategy is PeapodsETHStrategy {
-    constructor(address _myt, StrategyParams memory _params, address _vault, address _weth, address _permit2Address)
-        PeapodsETHStrategy(_myt, _params, _vault, _weth, _permit2Address)
+interface IERC20 {
+    function approve(address spender, uint256 amount) external returns (bool);
+    function balanceOf(address a) external view returns (uint256);
+}
+
+contract MockTokeAutoUSDStrategy is TokeAutoUSDStrategy {
+    constructor(address _myt, StrategyParams memory _params, address _autoUSD, address _router, address _rewarder, address _usdc, address _permit2Address)
+        TokeAutoUSDStrategy(_myt, _params, _autoUSD, _router, _rewarder, _usdc, _permit2Address)
     {}
 }
 
-contract PeapodsETHStrategyTest is BaseStrategyTest {
-    address public constant PEAPODS_ETH_VAULT = 0x9a42e1bEA03154c758BeC4866ec5AD214D4F2191;
-    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+contract TokeAutoUSDStrategyTest is BaseStrategyTest {
+    address public constant TOKE_AUTO_USD_VAULT = 0xa7569A44f348d3D70d8ad5889e50F78E33d80D35;
+    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address public constant MAINNET_PERMIT2 = 0x000000000022d473030f1dF7Fa9381e04776c7c5;
+    address public constant AUTOPILOT_ROUTER = 0x37dD409f5e98aB4f151F4259Ea0CC13e97e8aE21;
+    address public constant REWARDER = 0x726104CfBd7ece2d1f5b3654a19109A9e2b6c27B;
 
     function getStrategyConfig() internal pure override returns (IMYTStrategy.StrategyParams memory) {
         return IMYTStrategy.StrategyParams({
             owner: address(1),
-            name: "PeapodsETH",
-            protocol: "PeapodsETH",
-            riskClass: IMYTStrategy.RiskClass.HIGH,
-            cap: 10_000e18,
+            name: "TokeAutoUSD",
+            protocol: "TokeAutoUSD",
+            riskClass: IMYTStrategy.RiskClass.MEDIUM,
+            cap: 10_000e6,
             globalCap: 1e18,
-            estimatedYield: 100e18,
+            estimatedYield: 100e6,
             additionalIncentives: false,
             slippageBPS: 1
         });
     }
 
     function getTestConfig() internal pure override returns (TestConfig memory) {
-        return TestConfig({vaultAsset: WETH, vaultInitialDeposit: 1000e18, absoluteCap: 10_000e18, relativeCap: 1e18, decimals: 18});
+        return TestConfig({vaultAsset: USDC, vaultInitialDeposit: 1000e6, absoluteCap: 10_000e6, relativeCap: 1e18, decimals: 6});
     }
 
     function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
-        return address(new MockPeapodsETHStrategy(vault, params, PEAPODS_ETH_VAULT, WETH, MAINNET_PERMIT2));
+        return address(new MockTokeAutoUSDStrategy(vault, params, USDC, TOKE_AUTO_USD_VAULT, AUTOPILOT_ROUTER, REWARDER, MAINNET_PERMIT2));
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {
-        return 0;
+        return 22_089_302;
     }
 
     function getRpcUrl() internal view override returns (string memory) {

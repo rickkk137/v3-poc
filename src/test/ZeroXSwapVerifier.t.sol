@@ -35,26 +35,26 @@ contract ZeroXSwapVerifierTest is Test {
         deal(address(token), spender, 100e18);
     }
     
-    // Test basic sell to pool
+    // Test basic sell to pool with valid slippage
     function testVerifyBasicSellToPool() public {
-        bytes memory _calldata = _buildBasicSellToPoolCalldata(token, spender);
+        bytes memory _calldata = _buildBasicSellToPoolCalldata(token, spender, 500); // 500 bps = 5% slippage
         bool verified = ZeroXSwapVerifier.verifySwapCalldata(
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
         assertTrue(verified);
     }
     
-    // Test Uniswap V3 VIP
+    // Test Uniswap V3 VIP with valid slippage
     function testVerifyUniswapV3VIP() public {
-        bytes memory _calldata = _buildUniswapV3VIPCalldata(token, spender);
+        bytes memory _calldata = _buildUniswapV3VIPCalldata(token, spender, 300); // 300 bps = 3% slippage
         bool verified = ZeroXSwapVerifier.verifySwapCalldata(
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
         assertTrue(verified);
     }
@@ -66,7 +66,7 @@ contract ZeroXSwapVerifierTest is Test {
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
         assertTrue(verified);
     }
@@ -78,7 +78,7 @@ contract ZeroXSwapVerifierTest is Test {
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
         assertTrue(verified);
     }
@@ -90,19 +90,19 @@ contract ZeroXSwapVerifierTest is Test {
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
         assertTrue(verified);
     }
     
-    // Test Velodrome V2 VIP
+    // Test Velodrome V2 VIP with valid slippage
     function testVerifyVelodromeV2VIP() public {
-        bytes memory _calldata = _buildVelodromeV2VIPCalldata(token, spender);
+        bytes memory _calldata = _buildVelodromeV2VIPCalldata(token, spender, 200); // 200 bps = 2% slippage
         bool verified = ZeroXSwapVerifier.verifySwapCalldata(
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
         assertTrue(verified);
     }
@@ -115,7 +115,7 @@ contract ZeroXSwapVerifierTest is Test {
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
     }
     
@@ -127,32 +127,32 @@ contract ZeroXSwapVerifierTest is Test {
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
     }
     
     // Test token mismatch
     function testVerifyTokenMismatch() public {
         TestERC20 anotherToken = new TestERC20(1000e18, 18);
-        bytes memory _calldata = _buildBasicSellToPoolCalldata(token, spender);
+        bytes memory _calldata = _buildBasicSellToPoolCalldata(token, spender, 500);
         vm.expectRevert(bytes("IT"));
         bool verified = ZeroXSwapVerifier.verifySwapCalldata(
             _calldata,
             owner, 
             address(anotherToken), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
     }
     
-    // Test amount mismatch
-    function testVerifyAmountMismatch() public {
-        bytes memory _calldata = _buildBasicSellToPoolCalldata(token, spender);
-        vm.expectRevert(bytes("IA"));
+    // Test slippage too high
+    function testVerifySlippageTooHigh() public {
+        bytes memory _calldata = _buildBasicSellToPoolCalldata(token, spender, 1500); // 1500 bps = 15% slippage
+        vm.expectRevert(bytes("Slippage too high"));
         bool verified = ZeroXSwapVerifier.verifySwapCalldata(
             _calldata,
             owner, 
             address(token), 
-            200e18  // Different amount
+            1000 // 1000 bps = 10% max slippage
         );
     }
     
@@ -163,7 +163,7 @@ contract ZeroXSwapVerifierTest is Test {
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
         assertFalse(verified);
     }
@@ -175,30 +175,30 @@ contract ZeroXSwapVerifierTest is Test {
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
         assertFalse(verified);
     }
     
     // Test executeMetaTxn selector
     function testVerifyExecuteMetaTxn() public {
-        bytes memory _calldata = _buildExecuteMetaTxnCalldata(token, spender);
+        bytes memory _calldata = _buildExecuteMetaTxnCalldata(token, spender, 500); // 500 bps = 5% slippage
         bool verified = ZeroXSwapVerifier.verifySwapCalldata(
             _calldata,
             owner, 
             address(token), 
-            100e18
+            1000 // 1000 bps = 10% max slippage
         );
         assertTrue(verified);
     }
     
     // Helper functions to build calldata
     
-    function _buildBasicSellToPoolCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
+    function _buildBasicSellToPoolCalldata(TestERC20 _token, address recipient, uint256 bps) internal pure returns (bytes memory) {
         bytes memory action = abi.encodeWithSelector(
             BASIC_SELL_TO_POOL,
             address(_token),
-            100, // bps
+            bps, // bps
             recipient,
             0,
             ""
@@ -215,12 +215,12 @@ contract ZeroXSwapVerifierTest is Test {
         return abi.encodeWithSelector(EXECUTE_SELECTOR, saa, new bytes[](0));
     }
     
-    function _buildUniswapV3VIPCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
+    function _buildUniswapV3VIPCalldata(TestERC20 _token, address recipient, uint256 bps) internal pure returns (bytes memory) {
         bytes memory fills = abi.encode(address(_token), 100e18);
         bytes memory action = abi.encodeWithSelector(
             UNISWAPV3_VIP,
             recipient,
-            100, // bps
+            bps, // bps
             3000, // feeOrTickSpacing
             false, // feeOnTransfer
             fills
@@ -297,11 +297,11 @@ contract ZeroXSwapVerifierTest is Test {
         return abi.encodeWithSelector(EXECUTE_SELECTOR, saa, new bytes[](0));
     }
     
-    function _buildVelodromeV2VIPCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
+    function _buildVelodromeV2VIPCalldata(TestERC20 _token, address recipient, uint256 bps) internal pure returns (bytes memory) {
         bytes memory action = abi.encodeWithSelector(
             VELODROME_V2_VIP,
             address(_token),
-            100, // bps
+            bps, // bps
             false, // useEth
             0, // minAmountOut
             0, // deadline
@@ -337,11 +337,11 @@ contract ZeroXSwapVerifierTest is Test {
         return abi.encodePacked(bytes4(0xffffffff));
     }
     
-    function _buildExecuteMetaTxnCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
+    function _buildExecuteMetaTxnCalldata(TestERC20 _token, address recipient, uint256 bps) internal pure returns (bytes memory) {
         bytes memory action = abi.encodeWithSelector(
             BASIC_SELL_TO_POOL,
             address(_token),
-            100, // bps
+            bps, // bps
             recipient,
             0,
             ""

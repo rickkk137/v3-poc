@@ -32,8 +32,10 @@ library MYTTestHelper {
             cap: 100 ether,
             globalCap: 100 ether,
             estimatedYield: 100 ether,
-            additionalIncentives: false
+            additionalIncentives: false,
+            slippageBPS: 1
         });
-        return new MockMYTStrategy(myt, yieldToken, params);
+        address permit2Address = 0x000000000022d473030f1dF7Fa9381e04776c7c5; // Mainnet Permit2
+        return new MockMYTStrategy(myt, yieldToken, params, permit2Address);
     }
 }

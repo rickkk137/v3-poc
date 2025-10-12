@@ -3758,4 +3758,63 @@ contract AlchemistV3Test is Test {
         assertApproxEqAbs(earmarked + earmarkedBeef, alchemist.cumulativeEarmarked(), 1);
         assertApproxEqAbs(debt + debtBeef, alchemist.totalDebt(), 2);
     }
+
+    function testRedeemTwiceBetweenSyncUnredeemedFirst() external {
+        // This test fails because we do not have proper handling of redemptions that fully consume available earmark
+        vm.startPrank(address(0xbeef));
+        IERC20(fakeYieldToken).approve(address(alchemist), 100_000e18);
+        alchemist.deposit(100_000e18, address(0xbeef), 0);
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, 10_000e18, address(0xbeef));
+        vm.stopPrank();
+        deal(address(alToken), address(0xdad), 10_000e18);
+        vm.startPrank(address(0xdad));
+        IERC20(alToken).approve(address(transmuterLogic), 4000e18);
+        // Create redemption for 1_000 alUSD and claim
+        transmuterLogic.createRedemption(100e18);
+        transmuterLogic.createRedemption(1000e18);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
+        transmuterLogic.claimRedemption(2);
+        // Create redemption for 1_000 alUSD
+        transmuterLogic.createRedemption(1000e18);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
+        // Create another redemption for 1_000 alUSD after passing half period
+        transmuterLogic.createRedemption(1000e18);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
+        // Claim the second redemption
+        transmuterLogic.claimRedemption(3);
+        vm.stopPrank();
+        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        assertApproxEqAbs(debt, 10_000e18 - 2000e18, 1);
+        assertEq(earmarked, 600);
+    }
+
+    function testAudit_RedemptionWeight() external {
+        // This test fails because we do not have proper handling of redemptions that fully consume available earmark
+        vm.startPrank(address(0xbeef));
+        IERC20(fakeYieldToken).approve(address(alchemist), 100_000e18);
+        alchemist.deposit(100_000e18, address(0xbeef), 0);
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, 10_000e18, address(0xbeef));
+        vm.stopPrank();
+        deal(address(alToken), address(0xdad), 10_000e18);
+        vm.startPrank(address(0xdad));
+        IERC20(alToken).approve(address(transmuterLogic), 3000e18);
+        // Create redemption for 1_000 alUSD and claim
+        transmuterLogic.createRedemption(1000e18);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
+        transmuterLogic.claimRedemption(1);
+        // Create redemption for 1_000 alUSD
+        transmuterLogic.createRedemption(1000e18);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
+        // Create another redemption for 1_000 alUSD after passing half period
+        transmuterLogic.createRedemption(1000e18);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
+        // Claim the second redemption
+        transmuterLogic.claimRedemption(2);
+        vm.stopPrank();
+        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        assertApproxEqAbs(debt, 10_000e18 - 2000e18, 1);
+        assertEq(earmarked, 500);
+    }
 }

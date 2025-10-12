@@ -13,7 +13,9 @@ import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./base/Errors.sol";
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {IVaultV2} from "../lib/vault-v2/src/interfaces/IVaultV2.sol";
+import {IAlchemistTokenVault} from "./interfaces/IAlchemistTokenVault.sol";
+
+import {console2} from "forge-std/console2.sol";
 
 /// @title  AlchemistV3
 /// @author Alchemix Finance
@@ -593,6 +595,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // If amount is greater than cumulative earmarked it is due to rounding down the price of tokens held by the transmuter
         // This underpricing leads to the transmuter requesting more tokens than the alchemist has earmarked in some cases
         _redemptionWeight += PositionDecay.WeightIncrement(amount > cumulativeEarmarked ? cumulativeEarmarked : amount, cumulativeEarmarked);
+
+        console2.log(_redemptionWeight);
 
         // Calculate current fee price
         uint256 collRedeemed = convertDebtTokensToYield(amount);
