@@ -205,7 +205,6 @@ contract AlchemistV3Test is Test {
             admin: alOwner,
             debtToken: address(alToken),
             underlyingToken: address(vault.asset()),
-            blocksPerYear: 2_600_000,
             depositCap: type(uint256).max,
             minimumCollateralization: minimumCollateralization,
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
@@ -278,8 +277,6 @@ contract AlchemistV3Test is Test {
         uint256 feeVaultPreviousBalance = alchemistFeeVault.totalDeposits();
         // modify yield token price via modifying underlying token supply
         (uint256 prevCollateral, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
-        emit TestLogUint256("prevCollateral", prevCollateral);
-        emit TestLogUint256("prevDebt", prevDebt);
         uint256 initialVaultSupply = IERC20(address(mockStrategyYieldToken)).totalSupply();
         IMockYieldToken(mockStrategyYieldToken).updateMockTokenSupply(initialVaultSupply);
         // increasing yeild token suppy by 4000 bps or 40% while keeping the unederlying supply unchanged

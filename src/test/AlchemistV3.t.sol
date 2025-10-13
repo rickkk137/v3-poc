@@ -217,7 +217,6 @@ contract AlchemistV3Test is Test {
             admin: alOwner,
             debtToken: address(alToken),
             underlyingToken: address(vault.asset()),
-            blocksPerYear: 2_600_000,
             depositCap: type(uint256).max,
             minimumCollateralization: minimumCollateralization,
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
@@ -3762,7 +3761,7 @@ contract AlchemistV3Test is Test {
     function testRedeemTwiceBetweenSyncUnredeemedFirst() external {
         // This test fails because we do not have proper handling of redemptions that fully consume available earmark
         vm.startPrank(address(0xbeef));
-        IERC20(fakeYieldToken).approve(address(alchemist), 100_000e18);
+        SafeERC20.safeApprove(address(vault), address(alchemist), type(uint256).max);
         alchemist.deposit(100_000e18, address(0xbeef), 0);
         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
         alchemist.mint(tokenId, 10_000e18, address(0xbeef));
@@ -3791,7 +3790,7 @@ contract AlchemistV3Test is Test {
 
     function testAudit_RedemptionWeight() external {
         vm.startPrank(address(0xbeef));
-        IERC20(fakeYieldToken).approve(address(alchemist), 100_000e18);
+        SafeERC20.safeApprove(address(vault), address(alchemist), type(uint256).max);
         alchemist.deposit(100_000e18, address(0xbeef), 0);
         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
         alchemist.mint(tokenId, 10_000e18, address(0xbeef));
