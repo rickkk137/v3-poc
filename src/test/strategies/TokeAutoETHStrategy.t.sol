@@ -167,8 +167,8 @@ contract TokeAutoETHStrategyTest is BaseStrategyTest {
         return TestConfig({vaultAsset: WETH, vaultInitialDeposit: 1000e18, absoluteCap: 10_000e18, relativeCap: 1e18, decimals: 18});
     }
 
-    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address payable) {
-        return payable(address(new MockTokeAutoEthStrategy(vault, params, TOKE_AUTO_ETH_VAULT, AUTOPILOT_ROUTER, REWARDER, WETH, ORACLE, MAINNET_PERMIT2)));
+    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
+        return address(new MockTokeAutoEthStrategy(vault, params, TOKE_AUTO_ETH_VAULT, AUTOPILOT_ROUTER, REWARDER, WETH, ORACLE, MAINNET_PERMIT2));
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {

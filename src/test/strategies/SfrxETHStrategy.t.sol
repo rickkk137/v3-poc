@@ -27,17 +27,11 @@ contract SfrxETHStrategyTest is BaseStrategyTest {
     }
 
     function getTestConfig() internal pure override returns (TestConfig memory) {
-        return TestConfig({
-            vaultAsset: WETH,
-            vaultInitialDeposit: 100 ether,
-            absoluteCap: 100 ether,
-            relativeCap: 1 ether,
-            decimals: 18
-        });
+        return TestConfig({vaultAsset: WETH, vaultInitialDeposit: 100 ether, absoluteCap: 100 ether, relativeCap: 1 ether, decimals: 18});
     }
 
-    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address payable) {
-        return payable(new SfrxETHStrategy(vault, params, SFRXETH, FRAX_MINTER, REDEMPTION_QUEUE, MAINNET_PERMIT2));
+    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
+        return address(new SfrxETHStrategy(vault, params, SFRXETH, FRAX_MINTER, REDEMPTION_QUEUE, MAINNET_PERMIT2));
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {
@@ -57,22 +51,23 @@ contract SfrxETHStrategyTest is BaseStrategyTest {
         IMYTStrategy(strategy).allocate(prevAllocationAmount, amountToAllocate, "", address(vault));
         uint256 initialRealAssets = IMYTStrategy(strategy).realAssets();
         require(initialRealAssets > 0, "Initial real assets is 0");
-        
+
         bytes memory prevAllocationAmount2 = abi.encode(amountToAllocate);
         (, int256 change) = IMYTStrategy(strategy).deallocate(prevAllocationAmount2, amountToDeallocate, "", address(vault));
         uint256 positionId = uint256(change);
-        
+
         vm.warp(block.timestamp + 30 days);
-        
-        SfrxETHStrategy sfrxStrategy = SfrxETHStrategy(strategy);
-        uint256 ethOut = sfrxStrategy.claimWithdrawalQueue(positionId);
+
+        //SfrxETHStrategy sfrxStrategy = SfrxETHStrategy(strategy);
+        //uint256 ethOut = sfrxStrategy.claimWithdrawalQueue(positionId);
+        uint256 ethOut = IMYTStrategy(strategy).claimWithdrawalQueue(positionId);
         require(ethOut > 0, "ETH out should be greater than 0");
-        
+
         // Check that the strategy has enough WETH balance
         uint256 wethBalance = IERC20(WETH).balanceOf(address(strategy));
         console.log("Strategy WETH balance after claim:", wethBalance);
         console.log("Amount to transfer back:", ethOut);
-        
+
         // Fund the strategy with WETH to cover the transfer back to the vault
         deal(WETH, strategy, ethOut);
         vm.stopPrank();
@@ -83,21 +78,21 @@ contract SfrxETHStrategyTest is BaseStrategyTest {
         deal(testConfig.vaultAsset, strategy, 10 ether);
         bytes memory prevAllocationAmount = abi.encode(0);
         IMYTStrategy(strategy).allocate(prevAllocationAmount, 10 ether, "", address(vault));
-        
+
         uint256 realAssets = IMYTStrategy(strategy).realAssets();
         console.log("Real assets after allocation:", realAssets);
         assertGt(realAssets, 0);
-        
+
         // Test deallocation
         bytes memory prevAllocationAmount2 = abi.encode(10 ether);
         (, int256 change) = IMYTStrategy(strategy).deallocate(prevAllocationAmount2, 5 ether, "", address(vault));
         uint256 positionId = uint256(change);
-        
+
         // Wait for redemption
         vm.warp(block.timestamp + 30 days);
-        SfrxETHStrategy sfrxStrategy = SfrxETHStrategy(strategy);
-        sfrxStrategy.claimWithdrawalQueue(positionId);
-        
+        // SfrxETHStrategy sfrxStrategy = SfrxETHStrategy(strategy);
+        IMYTStrategy(strategy).claimWithdrawalQueue(positionId);
+
         uint256 realAssetsAfter = IMYTStrategy(strategy).realAssets();
         console.log("Real assets after deallocation:", realAssetsAfter);
         assertLt(realAssetsAfter, realAssets);
@@ -109,12 +104,12 @@ contract SfrxETHStrategyTest is BaseStrategyTest {
         deal(testConfig.vaultAsset, strategy, 10 ether);
         bytes memory prevAllocationAmount = abi.encode(0);
         IMYTStrategy(strategy).allocate(prevAllocationAmount, 10 ether, "", address(vault));
-        
+
         uint256 amount = 5 ether;
         uint256 adjustedAmount = IMYTStrategy(strategy).previewAdjustedWithdraw(amount);
         console.log("Original amount:", amount);
         console.log("Adjusted amount with slippage:", adjustedAmount);
-        
+
         // With slippageBPS = 1, adjusted amount should be slightly less
         assertLt(adjustedAmount, amount);
         vm.stopPrank();

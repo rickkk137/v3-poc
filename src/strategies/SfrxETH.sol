@@ -14,7 +14,7 @@ interface FraxMinter {
 
 interface FraxRedemptionQueue {
     function enterRedemptionQueueViaSfrxEth(address _recipient, uint120 _sfrxEthAmount) external returns (uint256 _nftId);
-    function burnRedemptionTicketNft(uint256 nftId, address payable recipient) external;
+    function burnRedemptionTicketNft(uint256 nftId, address recipient) external;
 }
 
 interface StakedFraxEth {
@@ -41,7 +41,7 @@ contract SfrxETHStrategy is MYTStrategy, IERC721Receiver {
         minter = FraxMinter(_fraxMinter);
         redemptionQueue = FraxRedemptionQueue(_redemptionQueue);
         sfrxEth = StakedFraxEth(_sfrxEth);
-        
+
         // Approve redemption queue to spend sfrxEth
         sfrxEth.approve(_redemptionQueue, type(uint256).max);
     }
@@ -57,12 +57,12 @@ contract SfrxETHStrategy is MYTStrategy, IERC721Receiver {
     function _deallocate(uint256 amount) internal override returns (uint256) {
         // protection for uint120 requirement
         require(amount <= type(uint120).max, "Amount exceeds uint120 max");
-        
+
         uint256 sfrxEthBalance = sfrxEth.balanceOf(address(this));
         uint256 amountToRedeem = amount > sfrxEthBalance ? sfrxEthBalance : amount;
-        
+
         require(amountToRedeem > 0, "No sfrxEth to redeem");
-        
+
         // Enter redemption queue and immediately claim the ETH
         uint256 nftId = redemptionQueue.enterRedemptionQueueViaSfrxEth(address(this), uint120(amountToRedeem));
         return nftId;
@@ -70,12 +70,12 @@ contract SfrxETHStrategy is MYTStrategy, IERC721Receiver {
 
     function _claimWithdrawalQueue(uint256 positionId) internal override returns (uint256 ethOut) {
         uint256 balanceBefore = address(this).balance;
-        redemptionQueue.burnRedemptionTicketNft(positionId, payable(address(this)));
+        redemptionQueue.burnRedemptionTicketNft(positionId, address(this));
         ethOut = address(this).balance - balanceBefore;
-        
+
         // Wrap the received ETH into WETH
         IWETH(WETH).deposit{value: ethOut}();
-        
+
         // Approve vault to spend the WETH
         IWETH(WETH).approve(address(MYT), ethOut);
     }

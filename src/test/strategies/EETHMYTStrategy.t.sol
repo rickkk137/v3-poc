@@ -27,17 +27,11 @@ contract EETHMYTStrategyTest is BaseStrategyTest {
     }
 
     function getTestConfig() internal pure override returns (TestConfig memory) {
-        return TestConfig({
-            vaultAsset: WETH,
-            vaultInitialDeposit: 100 ether,
-            absoluteCap: 100 ether,
-            relativeCap: 1 ether,
-            decimals: 18
-        });
+        return TestConfig({vaultAsset: WETH, vaultInitialDeposit: 100 ether, absoluteCap: 100 ether, relativeCap: 1 ether, decimals: 18});
     }
 
-    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address payable) {
-        return payable(new EETHMYTStrategy(vault, params, WEETH, WETH, DEPOSIT_ADAPTER, REDEMPTION_MANAGER, MAINNET_PERMIT2));
+    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
+        return address(new EETHMYTStrategy(vault, params, WEETH, WETH, DEPOSIT_ADAPTER, REDEMPTION_MANAGER, MAINNET_PERMIT2));
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {
@@ -57,22 +51,24 @@ contract EETHMYTStrategyTest is BaseStrategyTest {
         IMYTStrategy(strategy).allocate(prevAllocationAmount, amountToAllocate, "", address(vault));
         uint256 initialRealAssets = IMYTStrategy(strategy).realAssets();
         require(initialRealAssets > 0, "Initial real assets is 0");
-        
+
         bytes memory prevAllocationAmount2 = abi.encode(amountToAllocate);
         (, int256 change) = IMYTStrategy(strategy).deallocate(prevAllocationAmount2, amountToDeallocate, "", address(vault));
         uint256 positionId = uint256(change);
-        
+
         vm.warp(block.timestamp + 30 days);
-        
-        EETHMYTStrategy eethStrategy = EETHMYTStrategy(strategy);
-        uint256 ethOut = eethStrategy.claimWithdrawalQueue(positionId);
+
+        //EETHMYTStrategy eethStrategy = EETHMYTStrategy(strategy);
+        //uint256 ethOut = eethStrategy.claimWithdrawalQueue(positionId);
+
+        uint256 ethOut = IMYTStrategy(strategy).claimWithdrawalQueue(positionId);
         require(ethOut > 0, "ETH out should be greater than 0");
-        
+
         // Check that the strategy has enough WETH balance
         uint256 wethBalance = IERC20(WETH).balanceOf(address(strategy));
         console.log("Strategy WETH balance after claim:", wethBalance);
         console.log("Amount to transfer back:", ethOut);
-        
+
         // Fund the strategy with WETH to cover the transfer back to the vault
         deal(WETH, strategy, ethOut);
         vm.stopPrank();

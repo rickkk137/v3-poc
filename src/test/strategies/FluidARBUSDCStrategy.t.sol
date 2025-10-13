@@ -33,8 +33,8 @@ contract FluidARBUSDCStrategyTest is BaseStrategyTest {
         return TestConfig({vaultAsset: USDC, vaultInitialDeposit: 1000e6, absoluteCap: 10_000e6, relativeCap: 1e18, decimals: 6});
     }
 
-    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address payable) {
-        return payable(address(new MockFluidARBUSDCStrategy(vault, params, USDC, FLUID_USDC_VAULT, ARBITRUM_PERMIT2)));
+    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
+        return address(new MockFluidARBUSDCStrategy(vault, params, USDC, FLUID_USDC_VAULT, ARBITRUM_PERMIT2));
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {
