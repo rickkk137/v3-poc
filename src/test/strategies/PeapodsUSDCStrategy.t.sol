@@ -33,8 +33,8 @@ contract PeapodsUSDCStrategyTest is BaseStrategyTest {
         return TestConfig({decimals: 6, vaultAsset: USDC, vaultInitialDeposit: 1_000_000e6, absoluteCap: 10_000_000e6, relativeCap: 1e18});
     }
 
-    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
-        return address(new MockPeapodsUSDCStrategy(vault, params, PEAPODS_USDC_VAULT, USDC, MAINNET_PERMIT2));
+    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address payable) {
+        return payable(address(new MockPeapodsUSDCStrategy(vault, params, PEAPODS_USDC_VAULT, USDC, MAINNET_PERMIT2)));
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {

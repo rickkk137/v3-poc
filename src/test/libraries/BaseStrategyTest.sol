@@ -14,7 +14,7 @@ abstract contract BaseStrategyTest is Test {
     TestConfig public testConfig;
 
     // Common state variables
-    address public strategy;
+    address payable public strategy;
     address public vault;
     address public allocator;
     uint256 private _forkId;
@@ -28,7 +28,7 @@ abstract contract BaseStrategyTest is Test {
     // Abstract functions that must be implemented by child contracts
     function getTestConfig() internal virtual returns (TestConfig memory);
     function getStrategyConfig() internal virtual returns (IMYTStrategy.StrategyParams memory);
-    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal virtual returns (address);
+    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal virtual returns (address payable);
     function getForkBlockNumber() internal virtual returns (uint256);
     function getRpcUrl() internal virtual returns (string memory);
     // Test configuration struct
