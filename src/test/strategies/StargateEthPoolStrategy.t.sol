@@ -33,8 +33,8 @@ contract StargateEthPoolStrategyTest is BaseStrategyTest {
         return TestConfig({vaultAsset: WETH, vaultInitialDeposit: 10e18, absoluteCap: 10_000e18, relativeCap: 1e18, decimals: 18});
     }
 
-    function createStrategy(address myt, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
-        return address(new MockStargateEthPoolStrategy(myt, params, WETH, STARGATE_ETH_POOL, OPTIMISM_PERMIT2));
+    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
+        return address(new MockStargateEthPoolStrategy(vault, params, WETH, STARGATE_ETH_POOL, OPTIMISM_PERMIT2));
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {

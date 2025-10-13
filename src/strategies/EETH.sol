@@ -21,10 +21,6 @@ interface IWETH {
     function deposit() external payable;
 }
 
-interface DEBUG {
-    function balanceOf(address owner) external returns (uint256);
-}
-
 /**
  * TODO: Incomplete, Need to fully implement this strategy
  * @title EETHMYTStrategy
@@ -68,8 +64,11 @@ contract EETHMYTStrategy is MYTStrategy {
     function _deallocate(uint256 amount) internal override returns (uint256) {
         address lp = redemptionManager.liquidityPool();
 
-        require(amount <= address(lp).balance, "LIQ");
-        require(redemptionManager.canRedeem(amount), "do not redeeeeeem");
+        uint256 weethBalance = TokenUtils.safeBalanceOf(address(receiptToken), address(this));
+        require(amount <= weethBalance, "Insufficient weETH balance");
+
+        // Check if redemption is possible
+        require(redemptionManager.canRedeem(amount), "Cannot redeem");
 
         // Approve redemption manager to spend weETH
         TokenUtils.safeApprove(address(receiptToken), address(redemptionManager), amount);
@@ -99,6 +98,25 @@ contract EETHMYTStrategy is MYTStrategy {
         uint256 growth = (currentPPS - lastIndex) * FIXED_POINT_SCALAR / lastIndex;
         ratePerSec = growth / dt;
         return (ratePerSec, newIndex);
+    }
+
+    function realAssets() external view override returns (uint256) {
+        uint256 totalAssets = 0;
+        
+        // Add ETH balance
+        totalAssets += address(this).balance;
+        
+        // Add weETH balance (assuming 1:1 peg with ETH) FIXME
+        uint256 weethBalance = TokenUtils.safeBalanceOf(address(receiptToken), address(this));
+        totalAssets += weethBalance;
+        
+        return totalAssets;
+    }
+
+    function _previewAdjustedWithdraw(uint256 amount) internal view override returns (uint256) {
+        // Apply slippage to the amount of assets (ETH)
+        // slippageBPS is stored in params.slippageBPS
+        return amount - (amount * params.slippageBPS / 10_000);
     }
 
     receive() external payable {

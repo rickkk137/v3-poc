@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.28;
-// import {MYTStrategy} from "../MYTStrategy.sol";
 
 import {IWETH} from "../interfaces/IWETH.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
 import {MYTStrategy} from "../MYTStrategy.sol";
 import {IMYTStrategy} from "../interfaces/IMYTStrategy.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 interface FraxMinter {
     function submitAndDeposit(address recipient) external payable returns (uint256);
@@ -14,7 +14,7 @@ interface FraxMinter {
 
 interface FraxRedemptionQueue {
     function enterRedemptionQueueViaSfrxEth(address _recipient, uint120 _sfrxEthAmount) external returns (uint256 _nftId);
-    function burnRedemptionTicketNft(uint256 nftId, address payable recipient) external;
+    function burnRedemptionTicketNft(uint256 nftId, address recipient) external;
 }
 
 interface StakedFraxEth {
@@ -25,11 +25,10 @@ interface StakedFraxEth {
 }
 
 /**
- * TODO: Incomplete, Need to fully implement this strategy
  * @title SfrxETHStrategy
- * @notice This strategy is used to allocate and deallocate weth to the SfrxETH vault on Mainnet
+ * @notice This strategy is used to allocate and deallocate WETH to the SfrxETH vault on Mainnet
  */
-contract SfrxETHStrategy is MYTStrategy {
+contract SfrxETHStrategy is MYTStrategy, IERC721Receiver {
     FraxMinter public immutable minter;
     FraxRedemptionQueue public immutable redemptionQueue;
     StakedFraxEth public immutable sfrxEth;
@@ -38,9 +37,13 @@ contract SfrxETHStrategy is MYTStrategy {
     constructor(address _myt, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue, address _permit2Address)
         MYTStrategy(_myt, _params, _permit2Address, _sfrxEth)
     {
+        require(_redemptionQueue != address(0), "Zero redemption queue address");
         minter = FraxMinter(_fraxMinter);
         redemptionQueue = FraxRedemptionQueue(_redemptionQueue);
         sfrxEth = StakedFraxEth(_sfrxEth);
+
+        // Approve redemption queue to spend sfrxEth
+        sfrxEth.approve(_redemptionQueue, type(uint256).max);
     }
 
     function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
@@ -51,28 +54,30 @@ contract SfrxETHStrategy is MYTStrategy {
         depositReturn = minter.submitAndDeposit{value: amount}(address(this));
     }
 
-    // TODO dex swap should be separate
-    function _deallocate(uint256 amount) internal override returns (uint256 requestedAmount) {
+    function _deallocate(uint256 amount) internal override returns (uint256) {
         // protection for uint120 requirement
-        require(amount <= type(uint120).max);
-        // faking dex swap here
-        requestedAmount = _doDexSwap(amount);
-        TokenUtils.safeTransfer(WETH, msg.sender, requestedAmount);
-    }
+        require(amount <= type(uint120).max, "Amount exceeds uint120 max");
 
-    function _doDexSwap(uint256 amount) internal returns (uint256 amountReturned) {
-        // TODO: implement dex swap
-        address fakeDexAddress = address(0);
         uint256 sfrxEthBalance = sfrxEth.balanceOf(address(this));
-        uint256 adjusted = amount < sfrxEthBalance ? amount : sfrxEthBalance;
-        TokenUtils.safeApprove(address(sfrxEth), fakeDexAddress, adjusted);
-        // sfrxEth balance should for this address should now be reduced by amount
-        TokenUtils.safeTransfer(address(sfrxEth), fakeDexAddress, adjusted);
-        amountReturned = adjusted;
+        uint256 amountToRedeem = amount > sfrxEthBalance ? sfrxEthBalance : amount;
+
+        require(amountToRedeem > 0, "No sfrxEth to redeem");
+
+        // Enter redemption queue and immediately claim the ETH
+        uint256 nftId = redemptionQueue.enterRedemptionQueueViaSfrxEth(address(this), uint120(amountToRedeem));
+        return nftId;
     }
 
     function _claimWithdrawalQueue(uint256 positionId) internal override returns (uint256 ethOut) {
-        redemptionQueue.burnRedemptionTicketNft(positionId, payable(address(this)));
+        uint256 balanceBefore = address(this).balance;
+        redemptionQueue.burnRedemptionTicketNft(positionId, address(this));
+        ethOut = address(this).balance - balanceBefore;
+
+        // Wrap the received ETH into WETH
+        IWETH(WETH).deposit{value: ethOut}();
+
+        // Approve vault to spend the WETH
+        IWETH(WETH).approve(address(MYT), ethOut);
     }
 
     function _computeBaseRatePerSecond() internal override returns (uint256 ratePerSec, uint256 newIndex) {
@@ -89,6 +94,16 @@ contract SfrxETHStrategy is MYTStrategy {
 
     function realAssets() external view override returns (uint256) {
         return sfrxEth.convertToAssets(sfrxEth.balanceOf(address(this)));
+    }
+
+    function _previewAdjustedWithdraw(uint256 amount) internal view override returns (uint256) {
+        // Apply slippage to the amount of assets (ETH)
+        // slippageBPS is stored in params.slippageBPS
+        return amount - (amount * params.slippageBPS / 10_000);
+    }
+
+    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external pure returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
     }
 
     receive() external payable {

@@ -34,8 +34,8 @@ contract AaveV3ARBWETHStrategyTest is BaseStrategyTest {
         return TestConfig({vaultAsset: WETH, vaultInitialDeposit: 1000e18, absoluteCap: 10_000e18, relativeCap: 1e18, decimals: 18});
     }
 
-    function createStrategy(address myt, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
-        return address(new MockAaveV3ARBWETHStrategy(myt, params, AAVE_V3_ARB_WETH_ATOKEN, WETH, AAVE_V3_ARB_WETH_POOL, ARBITRUM_PERMIT2));
+    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
+        return address(new MockAaveV3ARBWETHStrategy(vault, params, AAVE_V3_ARB_WETH_ATOKEN, WETH, AAVE_V3_ARB_WETH_POOL, ARBITRUM_PERMIT2));
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {

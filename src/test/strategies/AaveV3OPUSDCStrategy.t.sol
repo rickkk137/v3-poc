@@ -34,8 +34,8 @@ contract AaveV3OPUSDCStrategyTest is BaseStrategyTest {
         return TestConfig({vaultAsset: USDC, vaultInitialDeposit: 1000e6, absoluteCap: 10_000e6, relativeCap: 1e18, decimals: 6});
     }
 
-    function createStrategy(address myt, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
-        return address(new MockAaveV3OPUSDCStrategy(myt, params, USDC, AAVE_V3_USDC_ATOKEN, AAVE_V3_USDC_POOL, OPTIMISM_PERMIT2));
+    function createStrategy(address vault, IMYTStrategy.StrategyParams memory params) internal override returns (address) {
+        return address(new MockAaveV3OPUSDCStrategy(vault, params, USDC, AAVE_V3_USDC_ATOKEN, AAVE_V3_USDC_POOL, OPTIMISM_PERMIT2));
     }
 
     function getForkBlockNumber() internal pure override returns (uint256) {
