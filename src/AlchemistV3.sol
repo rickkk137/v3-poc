@@ -889,10 +889,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             }
         }
 
-        if (amountLiquidated + repaidAmountInYield > 0) {
-            emit Liquidated(accountId, msg.sender, amountLiquidated + repaidAmountInYield, feeInYield, feeInUnderlying);
-        }
-
+        emit Liquidated(accountId, msg.sender, amountLiquidated + repaidAmountInYield, feeInYield, feeInUnderlying);
         return (amountLiquidated + repaidAmountInYield, feeInYield, feeInUnderlying);
     }
 
