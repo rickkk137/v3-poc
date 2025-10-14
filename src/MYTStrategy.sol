@@ -25,6 +25,11 @@ interface IPermit2 {
     function isValidSignature(bytes32 hash, bytes memory signature) external view returns (bytes4);
 }
 
+/**
+ * @title MYTStrategy
+ * @notice The MYT is a Morpho V2 Vault, and each strategy is just a vault adapter which interfaces with a third party protocol
+ * @notice This contract should be inherited by all strategies
+ */
 contract MYTStrategy is IMYTStrategy, Ownable {
     IVaultV2 public immutable MYT;
     address public immutable receiptToken;
@@ -64,6 +69,13 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         _;
     }
 
+    /**
+     * @notice Constructor for the MYTStrategy contract
+     * @param _myt The address of the MYT vault
+     * @param _params The parameters for the strategy
+     * @param _permit2Address The address of the Permit2 contract
+     * @param _receiptToken The address of the receipt token
+     */
     constructor(address _myt, StrategyParams memory _params, address _permit2Address, address _receiptToken) Ownable(_params.owner) {
         require(_params.owner != address(0));
         require(_myt != address(0));
@@ -86,6 +98,7 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         // TODO perhap take initial snapshot now to set up start block
     }
 
+    /// @notice See Morpho V2 vault spec
     function allocate(bytes memory data, uint256 assets, bytes4 selector, address sender)
         external
         onlyVault
@@ -102,6 +115,7 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         return (ids(), int256(newAllocation) - int256(oldAllocation));
     }
 
+    /// @notice See Morpho V2 vault spec
     function deallocate(bytes memory data, uint256 assets, bytes4 selector, address sender)
         external
         onlyVault
@@ -118,31 +132,12 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         return (ids(), int256(newAllocation) - int256(oldAllocation));
     }
 
+    /// @notice helper function to estimate the correct amount that can be fully
+    /// withdrawn from a strategy, accounting for losses
+    /// due to slippage, protocol fees, and rounding differences
     function previewAdjustedWithdraw(uint256 amount) external view returns (uint256) {
         require(amount > 0, "Zero amount");
         return _previewAdjustedWithdraw(amount);
-    }
-
-    /// @notice call this function to handle unwrapping/deallocation/moving funds from
-    /// the respective protocol of this strategy in case we want to bypass
-    /// a withdrawal queue or similar mechanism and directly go to a DEX
-    function deallocateDex(bytes calldata quote, bool prevSettler) external returns (uint256 ret) {
-        require(!killSwitch, "emergency");
-        IERC20 asset = IERC20(receiptToken);
-        // TODO additional access control needed?
-        require(whitelistedAllocators[msg.sender], "PD");
-        address currentSettler = prevSettler ? ZERO_EX_DEPLOYER.prev(2) : ZERO_EX_DEPLOYER.ownerOf(2);
-        uint256 balanceBefore = asset.balanceOf(address(this));
-
-        // Set maximum allowed slippage to 10% (1000 bps)
-        uint256 maxSlippageBps = 1000;
-        require(ZeroXSwapVerifier.verifySwapCalldata(quote, address(this), receiptToken, maxSlippageBps));
-
-        (bool success,) = currentSettler.call(quote);
-        require(success, "SF"); // settler failed
-        uint256 balanceAfter = asset.balanceOf(address(this));
-        ret = balanceBefore - balanceAfter;
-        emit DeallocateDex(ret);
     }
 
     /// @notice call this function to handle strategies with withdrawal queue NFT
@@ -308,6 +303,8 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         return abi.encode(params.protocol);
     }
 
+    /// @dev override this function to return the total underlying value of the strategy
+    /// @dev must return the total underling value of the strategy's position (i.e. in vault asset e.g. USDC or WETH)
     function realAssets() external view virtual returns (uint256) {}
 
     /// @notice ERC-1271 interface for Permit2 signature verification

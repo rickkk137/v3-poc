@@ -41,11 +41,6 @@ interface IMYTStrategy {
     /// the respective protocol of this strategy
     function deallocate(bytes memory data, uint256 assets, bytes4 selector, address sender) external returns (bytes32[] memory strategyIds, int256 change);
 
-    /// @notice call this function to handle unwrapping/deallocation/moving funds from
-    /// the respective protocol of this strategy in case we want to bypass
-    /// a withdrawal queue or similar mechanism and directly go to a DEX
-    function deallocateDex(bytes calldata quote, bool prevSettler) external returns (uint256 ret);
-
     /// @dev override this function to handle strategies with withdrawal queue NFT
     function claimWithdrawalQueue(uint256 positionId) external returns (uint256);
 

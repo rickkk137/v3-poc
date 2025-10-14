@@ -7,6 +7,11 @@ import {PermissionedProxy} from "./utils/PermissionedProxy.sol";
 import {IAllocator} from "./interfaces/IAllocator.sol";
 import {IMYTStrategy} from "./interfaces/IMYTStrategy.sol";
 
+/**
+ * @title AlchemistAllocator
+ * @notice This contract is used to allocate and deallocate funds to and from MYT strategies
+ * @notice The MYT is a Morpho V2 Vault, and each strategy is just a vault adapter which interfaces with a third party protocol
+ */
 contract AlchemistAllocator is PermissionedProxy, IAllocator {
     IVaultV2 immutable vault;
 
