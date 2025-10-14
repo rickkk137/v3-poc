@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import { IStrategyClassifier } from "./interfaces/IStrategyClassifier.sol";
+import {IStrategyClassifier} from "./interfaces/IStrategyClassifier.sol";
 
+/**
+ * @title AlchemistStrategyClassifier
+ * @notice This contract is used to classify strategies based on their risk level and set the respective caps
+ * @notice The MYT is a Morpho V2 Vault, and each strategy is just a vault adapter which interfaces with a third party protocol
+ */
 contract AlchemistStrategyClassifier is IStrategyClassifier {
     address public admin;
     address public pendingAdmin;
@@ -13,7 +18,7 @@ contract AlchemistStrategyClassifier is IStrategyClassifier {
      */
     struct RiskClass {
         uint256 globalCap; // Max allocation for all strategies in this class combined
-        uint256 localCap;  // Max allocation for this single strategy in the class
+        uint256 localCap; // Max allocation for this single strategy in the class
     }
 
     /// riskLevel => RiskClass data

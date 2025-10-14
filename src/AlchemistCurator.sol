@@ -7,7 +7,11 @@ import {PermissionedProxy} from "./utils/PermissionedProxy.sol";
 import {IMYTStrategy} from "./interfaces/IMYTStrategy.sol";
 import {IAlchemistCurator} from "./interfaces/IAlchemistCurator.sol";
 
-// AlchemistCurator is a Minimal contract that allows only the admin (e.g. DAO) to modify the absolute and relative caps of an myt strategy
+/**
+ * @title AlchemistCurator
+ * @notice This contract is used to update MYT caps and add/remove strategies to the MYT
+ * @notice The MYT is a Morpho V2 Vault, and each strategy is just a vault adapter which interfaces with a third party protocol
+ */
 contract AlchemistCurator is IAlchemistCurator, PermissionedProxy {
     // map of myt adapter(strategy) address to myt address
     mapping(address => address) public adapterToMYT;
