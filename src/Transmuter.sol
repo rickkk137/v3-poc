@@ -267,11 +267,14 @@ contract Transmuter is ITransmuter, ERC721 {
 
     /// @inheritdoc ITransmuter
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
-        int256 queried = _stakingGraph.queryStake(startBlock, endBlock);
+        if (endBlock <= startBlock) return 0;
 
+        int256 queried = _stakingGraph.queryStake(startBlock, endBlock);
         if (queried == 0) return 0;
-        // + 1 for rounding error
-        return (queried / BLOCK_SCALING_FACTOR).toUint256() + 1;
+
+        // You currently add +1 for rounding; keep in mind this can create off-by-one deltas.
+        return (queried / BLOCK_SCALING_FACTOR).toUint256()
+            + (queried % BLOCK_SCALING_FACTOR == 0 ? 0 : 1);
     }
 
     /// @dev Updates staking graphs
