@@ -549,7 +549,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkForValidAccountId(accountId);
         (yieldAmount, feeInYield, feeInUnderlying) = _liquidate(accountId);
         if (yieldAmount > 0) {
-            emit Liquidated(accountId, msg.sender, yieldAmount, feeInYield, feeInUnderlying);
             return (yieldAmount, feeInYield, feeInUnderlying);
         } else {
             // no liquidation amount returned, so no liquidation happened
@@ -752,6 +751,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         uint256 protocolFeeTotal = creditToYield * protocolFee / BPS;
 
+        emit ForceRepay(accountId, amount, creditToYield, protocolFeeTotal);
+
         if (account.collateralBalance > protocolFeeTotal) {
             account.collateralBalance -= protocolFeeTotal;
             // Transfer the protocol fee to the protocol fee receiver
@@ -762,7 +763,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             // Transfer the repaid tokens from the account to the transmuter.
             TokenUtils.safeTransfer(myt, address(transmuter), creditToYield);
         }
-
         return creditToYield;
     }
 
@@ -874,6 +874,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             }
         }
 
+        if (amountLiquidated + repaidAmountInYield > 0) {
+            emit Liquidated(accountId, msg.sender, amountLiquidated + repaidAmountInYield, feeInYield, feeInUnderlying);
+        }
+
         return (amountLiquidated + repaidAmountInYield, feeInYield, feeInUnderlying);
     }
 
@@ -886,6 +890,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // calculate repayment fee and deduct from account
         fee = repaidAmountInYield * repaymentFee / BPS;
         account.collateralBalance -= fee > account.collateralBalance ? account.collateralBalance : fee;
+        emit RepaymentFee(accountId, repaidAmountInYield, msg.sender, fee);
         return fee;
     }
 

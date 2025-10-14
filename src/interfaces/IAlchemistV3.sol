@@ -584,6 +584,22 @@ interface IAlchemistV3Events {
     ///
     /// @param tokenId       The tokenId of the account.
     event MintAllowancesReset(uint256 indexed tokenId);
+
+    /// @notice Emitted when `amount` of debt is force repaid from `accountId`.
+    ///
+    /// @param accountId       The tokenId of the account.
+    /// @param amount          The amount of debt repaid.
+    /// @param creditToYield   The amount of collateral used to repay the debt in yield tokens.
+    /// @param protocolFeeTotal The amount of protocol fee paid.
+    event ForceRepay(uint256 indexed accountId, uint256 amount, uint256 creditToYield, uint256 protocolFeeTotal);
+
+    /// @notice Emitted when `amount` of debt is repaid from `accountId`.
+    ///
+    /// @param accountId       The tokenId of the account.
+    /// @param amount          The amount of debt repaid.
+    /// @param feeReciever     The address of the fee receiver.
+    /// @param fee             The amount of fee paid.
+    event RepaymentFee(uint256 indexed accountId, uint256 amount, address feeReciever, uint256 fee);
 }
 
 interface IAlchemistV3Immutables {
