@@ -3272,47 +3272,47 @@ contract AlchemistV3Test is Test {
         assertEq(synctectiAssetBefore - (25e18), synctectiAssetAfter);
     }
 
-    // function testCrashDueToWeightIncrementCheck() external {
-    //     bytes memory expectedError = "WeightIncrement: increment > total";
-    //     // 1. Create a position
-    //     uint256 amount = 100e18;
-    //     address user = address(0xbeef);
-    //     vm.startPrank(user);
-    //     SafeERC20.safeApprove(address(vault), address(alchemist), type(uint256).max);
-    //     alchemist.deposit(amount, user, 0);
-    //     uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
-    //     uint256 borrowedAmount = amount / 2; // Arbitrary, can be fuzzed over.
-    //     alchemist.mint(tokenId, borrowedAmount, user);
-    //     vm.stopPrank();
-    //     // 2. Create a redemption
-    //     // This populates the queryGraph with values.
-    //     // After timeToTransmute has passed, the amount to pull with earmarking
-    //     vm.startPrank(address(0xdad));
-    //     SafeERC20.safeApprove(address(alToken), address(transmuterLogic), borrowedAmount);
-    //     transmuterLogic.createRedemption(borrowedAmount);
-    //     vm.stopPrank();
-    //     // 3. Repay any amount.
-    //     // This sends yield tokens to the transmuter and reduces total debt.
-    //     // It does not affect what is in the queryGraph.
-    //     vm.startPrank(user);
-    //     vm.roll(block.number + 1);
-    //     alchemist.repay(1, tokenId);
-    //     vm.stopPrank();
-    //     // 4. Let the claim mature.
-    //     vm.roll(block.number + 5_256_000);
-    //     vm.startPrank(address(0xdad));
-    //     transmuterLogic.claimRedemption(1);
-    //     vm.stopPrank();
-    //     // All regular Alchemist operations still succeed
-    //     vm.startPrank(address(0xbeef));
-    //     alchemist.poke(tokenId);
-    //     alchemist.withdraw(1, user, tokenId);
-    //     alchemist.mint(tokenId, 1, user);
-    //     vm.roll(block.number + 1);
-    //     alchemist.repay(1, tokenId);
-    //     vm.stopPrank();
-    //     alchemist.getCDP(tokenId);
-    // }
+    function testCrashDueToWeightIncrementCheck() external {
+        bytes memory expectedError = "WeightIncrement: increment > total";
+        // 1. Create a position
+        uint256 amount = 100e18;
+        address user = address(0xbeef);
+        vm.startPrank(user);
+        SafeERC20.safeApprove(address(vault), address(alchemist), type(uint256).max);
+        alchemist.deposit(amount, user, 0);
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
+        uint256 borrowedAmount = amount / 2; // Arbitrary, can be fuzzed over.
+        alchemist.mint(tokenId, borrowedAmount, user);
+        vm.stopPrank();
+        // 2. Create a redemption
+        // This populates the queryGraph with values.
+        // After timeToTransmute has passed, the amount to pull with earmarking
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), borrowedAmount);
+        transmuterLogic.createRedemption(borrowedAmount);
+        vm.stopPrank();
+        // 3. Repay any amount.
+        // This sends yield tokens to the transmuter and reduces total debt.
+        // It does not affect what is in the queryGraph.
+        vm.startPrank(user);
+        vm.roll(block.number + 1);
+        alchemist.repay(1, tokenId);
+        vm.stopPrank();
+        // 4. Let the claim mature.
+        vm.roll(block.number + 5_256_000);
+        vm.startPrank(address(0xdad));
+        transmuterLogic.claimRedemption(1);
+        vm.stopPrank();
+        // All regular Alchemist operations still succeed
+        vm.startPrank(address(0xbeef));
+        alchemist.poke(tokenId);
+        alchemist.withdraw(1, user, tokenId);
+        alchemist.mint(tokenId, 1, user);
+        vm.roll(block.number + 1);
+        alchemist.repay(1, tokenId);
+        vm.stopPrank();
+        alchemist.getCDP(tokenId);
+    }
 
     function testDebtMintingRedemptionWithdraw() external {
         uint256 amount = 100e18;
@@ -3502,23 +3502,23 @@ contract AlchemistV3Test is Test {
         assertEq(alchemistYTAfter, 549_999_775_000_112_500);
     }
 
-    // function testClaimRedemptionRoundUp() external {
-    //     uint256 amount = 100e18;
-    //     vm.startPrank(address(0xbeef));
-    //     SafeERC20.safeApprove(address(vault), address(alchemist), 99_999e18);
-    //     alchemist.deposit(amount, address(0xbeef), 0);
-    //     uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-    //     alchemist.mint(tokenId, 80e18, address(0xbeef));
-    //     SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 9999e18);
-    //     for (uint256 i = 1; i < 4; i++) {
-    //         transmuterLogic.createRedemption(1e18);
-    //     }
-    //     vm.roll(block.number + 1);
-    //     for (uint256 i = 1; i < 4; i++) {
-    //         transmuterLogic.claimRedemption(i);
-    //     }
-    //     vm.stopPrank();
-    // }
+    function testClaimRedemptionRoundUp() external {
+        uint256 amount = 100e18;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(vault), address(alchemist), 99_999e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, 80e18, address(0xbeef));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 9999e18);
+        for (uint256 i = 1; i < 4; i++) {
+            transmuterLogic.createRedemption(1e18);
+        }
+        vm.roll(block.number + 1);
+        for (uint256 i = 1; i < 4; i++) {
+            transmuterLogic.claimRedemption(i);
+        }
+        vm.stopPrank();
+    }
 
     function testRepayWithEarmarkedDebt_MultiplePoke_Broken() external {
         uint256 amount = 100e18;

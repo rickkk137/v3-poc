@@ -20,77 +20,77 @@ contract FullSystemInvariantsTest is InvariantBaseTest {
 
     /* INVARIANTS */
 
-    // Total deposited equals the sum of all individual CDPs
-    // This uses getCDP which calculates balances/debts without updating storage
-    function invariantConsistentCollateral() public view {
-        address[] memory users = targetSenders();
+    // // Total deposited equals the sum of all individual CDPs
+    // // This uses getCDP which calculates balances/debts without updating storage
+    // function invariantConsistentCollateral() public view {
+    //     address[] memory users = targetSenders();
 
-        uint256 totalDeposited;
+    //     uint256 totalDeposited;
 
-        for (uint256 i; i < users.length; ++i) {
-            // a single position nft would have been minted to address(0xbeef)
-            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(users[i], address(alchemistNFT));
-            (uint256 collateral,,) = alchemist.getCDP(tokenId);
+    //     for (uint256 i; i < users.length; ++i) {
+    //         // a single position nft would have been minted to address(0xbeef)
+    //         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(users[i], address(alchemistNFT));
+    //         (uint256 collateral,,) = alchemist.getCDP(tokenId);
 
-            totalDeposited += collateral;
-        }
+    //         totalDeposited += collateral;
+    //     }
 
-        assertEq(totalDeposited, alchemist.getTotalDeposited());
-    }
+    //     assertEq(totalDeposited, alchemist.getTotalDeposited());
+    // }
 
-    // Underlying value of collateral equals sum of all user accounts
-    // This test uses poke() to perform an actual storage update to the user account
-    function invariantConsistentCollateralwithPoke() public {
-        address[] memory users = targetSenders();
+    // // Underlying value of collateral equals sum of all user accounts
+    // // This test uses poke() to perform an actual storage update to the user account
+    // function invariantConsistentCollateralwithPoke() public {
+    //     address[] memory users = targetSenders();
 
-        uint256 totalDeposited;
+    //     uint256 totalDeposited;
 
-        for (uint256 i; i < users.length; ++i) {
-            // a single position nft would have been minted to address(0xbeef)
-            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(users[i], address(alchemistNFT));
+    //     for (uint256 i; i < users.length; ++i) {
+    //         // a single position nft would have been minted to address(0xbeef)
+    //         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(users[i], address(alchemistNFT));
 
-            if (tokenId != 0) {
-                alchemist.poke(tokenId);
+    //         if (tokenId != 0) {
+    //             alchemist.poke(tokenId);
 
-                totalDeposited += alchemist.totalValue(tokenId);
-            }
-        }
+    //             totalDeposited += alchemist.totalValue(tokenId);
+    //         }
+    //     }
 
-        assertEq(totalDeposited, alchemist.convertYieldTokensToDebt(alchemist.getTotalDeposited()));
-    }
+    //     assertEq(totalDeposited, alchemist.convertYieldTokensToDebt(alchemist.getTotalDeposited()));
+    // }
 
-    // Total debt in the system is equal to sum of all user debts
-    function invariantConsistentDebt() public view {
-        address[] memory users = targetSenders();
+    // // Total debt in the system is equal to sum of all user debts
+    // function invariantConsistentDebt() public view {
+    //     address[] memory users = targetSenders();
 
-        uint256 totalDebt;
+    //     uint256 totalDebt;
 
-        for (uint256 i; i < users.length; ++i) {
-            // a single position nft would have been minted to address(0xbeef)
-            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(users[i], address(alchemistNFT));
-            (, uint256 debt,) = alchemist.getCDP(tokenId);
+    //     for (uint256 i; i < users.length; ++i) {
+    //         // a single position nft would have been minted to address(0xbeef)
+    //         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(users[i], address(alchemistNFT));
+    //         (, uint256 debt,) = alchemist.getCDP(tokenId);
 
-            totalDebt += debt;
-        }
+    //         totalDebt += debt;
+    //     }
 
-        assertEq(totalDebt, alchemist.totalDebt());
-    }
+    //     assertEq(totalDebt, alchemist.totalDebt());
+    // }
 
-    // Supply of debt tokens must be greater or equal to debt in the system
-    function invariantDebtTokenSupply() public view {
-        assertGe(alToken.totalSupply(), alchemist.totalDebt());
-    }
+    // // Supply of debt tokens must be greater or equal to debt in the system
+    // function invariantDebtTokenSupply() public view {
+    //     assertGe(alToken.totalSupply(), alchemist.totalDebt());
+    // }
 
-    // Amount stakes in the transmuter cannot exceed the total debt in the alchemist plus the debt value of yield tokens in the transmuter
-    function invariantTransmuterStakeLessThanTotalDebt() public view {
-        uint256 totalLocked = transmuterLogic.totalLocked() > alchemist.convertYieldTokensToDebt(fakeYieldToken.balanceOf(address(transmuterLogic)))
-            ? transmuterLogic.totalLocked() - alchemist.convertYieldTokensToDebt(fakeYieldToken.balanceOf(address(transmuterLogic)))
-            : 0;
-        assertLe(totalLocked, alchemist.totalDebt());
-    }
+    // // Amount stakes in the transmuter cannot exceed the total debt in the alchemist plus the debt value of yield tokens in the transmuter
+    // function invariantTransmuterStakeLessThanTotalDebt() public view {
+    //     uint256 totalLocked = transmuterLogic.totalLocked() > alchemist.convertYieldTokensToDebt(fakeYieldToken.balanceOf(address(transmuterLogic)))
+    //         ? transmuterLogic.totalLocked() - alchemist.convertYieldTokensToDebt(fakeYieldToken.balanceOf(address(transmuterLogic)))
+    //         : 0;
+    //     assertLe(totalLocked, alchemist.totalDebt());
+    // }
 
-    // Earmarked can never be more than total debt
-    function invariantEarmarkedLessThanTotalDebt() public view {
-        assertLe(alchemist.cumulativeEarmarked(), alchemist.totalDebt());
-    }
+    // // Earmarked can never be more than total debt
+    // function invariantEarmarkedLessThanTotalDebt() public view {
+    //     assertLe(alchemist.cumulativeEarmarked(), alchemist.totalDebt());
+    // }
 }

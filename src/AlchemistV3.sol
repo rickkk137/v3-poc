@@ -42,6 +42,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     address public debtToken;
 
     /// @inheritdoc IAlchemistV3State
+    address public myt;
+
+    /// @inheritdoc IAlchemistV3State
     uint256 public underlyingConversionFactor;
 
     /// @inheritdoc IAlchemistV3State
@@ -132,9 +135,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @dev User accounts
     mapping(uint256 => Account) private _accounts;
-
-    /// @inheritdoc IAlchemistV3State
-    address public myt;
 
     /// @dev Historic redemptions
     mapping(uint256 => RedemptionInfo) private _redemptions;

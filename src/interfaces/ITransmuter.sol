@@ -60,9 +60,6 @@ interface ITransmuter {
     /// @notice Returns the total locked debt tokens in the transmuter.
     function totalLocked() external view returns (uint256 totalLocked);
 
-    /// @notice Returns array of alchemists.
-    function alchemists(uint256) external view returns (address alchemist);
-
     function protocolFeeReceiver() external view returns (address receiver);
 
     /// @notice Sets the pending administrator.
