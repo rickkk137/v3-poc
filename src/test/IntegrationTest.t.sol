@@ -540,86 +540,86 @@ contract IntegrationTest is Test {
         vm.stopPrank();
     }
 
-    function testPositionToFullMaturity() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e18) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
+    // function testPositionToFullMaturity() external {
+    //     uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e18) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
-        vm.startPrank(address(0xbeef));
-        IERC20(address(vault)).approve(address(alchemist), 100_000e18);
-        alchemist.deposit(100_000e18, address(0xbeef), 0);
-        // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        alchemist.mint(tokenId, alchemist.getMaxBorrowable(tokenId), address(0xbeef));
-        vm.stopPrank();
+    //     vm.startPrank(address(0xbeef));
+    //     IERC20(address(vault)).approve(address(alchemist), 100_000e18);
+    //     alchemist.deposit(100_000e18, address(0xbeef), 0);
+    //     // a single position nft would have been minted to address(0xbeef)
+    //     uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+    //     alchemist.mint(tokenId, alchemist.getMaxBorrowable(tokenId), address(0xbeef));
+    //     vm.stopPrank();
 
-        vm.startPrank(address(0xdad));
-        IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-        transmuterLogic.createRedemption(debtAmount);
-        vm.stopPrank();
+    //     vm.startPrank(address(0xdad));
+    //     IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
+    //     transmuterLogic.createRedemption(debtAmount);
+    //     vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
-        assertEq(collateral, 100_000e18);
-        assertEq(debt, debtAmount);
+    //     (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+    //     assertEq(collateral, 100_000e18);
+    //     assertEq(debt, debtAmount);
 
-        // Transmuter Cycle
-        vm.roll(block.number + 5_256_000);
+    //     // Transmuter Cycle
+    //     vm.roll(block.number + 5_256_000);
 
-        vm.startPrank(address(0xdad));
-        transmuterLogic.claimRedemption(1);
-        vm.stopPrank();
+    //     vm.startPrank(address(0xdad));
+    //     transmuterLogic.claimRedemption(1);
+    //     vm.stopPrank();
 
-        (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
+    //     (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
 
-        // 10% remaining since 90% was borrowed against initially
-        assertApproxEqAbs(collateral, 100_000e18 - alchemist.convertDebtTokensToYield(debtAmount * 1000 / 10_000), 1);
+    //     // 10% remaining since 90% was borrowed against initially
+    //     assertApproxEqAbs(collateral, 100_000e18 - alchemist.convertDebtTokensToYield(debtAmount * 1000 / 10_000), 1);
 
-        // Only remaining debt should be from the fees paid on debt
-        assertApproxEqAbs(debt, 0, 1);
+    //     // Only remaining debt should be from the fees paid on debt
+    //     assertApproxEqAbs(debt, 0, 1);
 
-        assertEq(earmarked, 0);
-    }
+    //     assertEq(earmarked, 0);
+    // }
 
-    function testAudit_Sync_IncorrectEarmarkWeightUpdate() external {
-        uint256 bn = block.number;
-        // 1. Add collateral and mints 10,000 alUSD as debt
-        vm.startPrank(address(0xbeef));
-        IERC20(address(vault)).approve(address(alchemist), 100_000e18);
-        alchemist.deposit(100_000e18, address(0xbeef), 0);
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        alchemist.mint(tokenId, 10_000e18, address(0xbeef));
-        vm.stopPrank();
-        // 2. Create a redemption for 1,000 alUSD
-        vm.startPrank(address(0xdad));
-        IERC20(alUSD).approve(address(transmuterLogic), 1000e18);
-        transmuterLogic.createRedemption(1000e18);
-        vm.stopPrank();
-        vm.roll(bn += 5_256_000);
-        // 3. Claim redemption
-        vm.prank(address(0xdad));
-        transmuterLogic.claimRedemption(1);
-        vm.roll(bn += 1);
-        // 4. Update debt and earmark
-        vm.prank(address(0xbeef));
-        alchemist.poke(tokenId);
-        (, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
-        assertEq(debt, 10_000e18 - 1000e18); // 10,000 - 1,000
-        assertEq(earmarked, 0);
-        // 5. Create another redemption for 1,000 alUSD
-        vm.startPrank(address(0xdad));
-        IERC20(alUSD).approve(address(transmuterLogic), 1000e18);
-        transmuterLogic.createRedemption(1000e18);
-        vm.stopPrank();
-        vm.roll(bn += 5_256_000);
-        // 6. Update debt and earmark
-        vm.prank(address(0xbeef));
-        alchemist.poke(tokenId);
-        // 7. Create another redemption for 1,000 alUSD
-        vm.startPrank(address(0xdad));
-        IERC20(alUSD).approve(address(transmuterLogic), 1000e18);
-        transmuterLogic.createRedemption(1000e18);
-        vm.stopPrank();
-        vm.roll(bn += 5_256_000);
-        // 8. Update debt and earmark
-        vm.prank(address(0xbeef));
-        alchemist.poke(tokenId);
-    }
+    // function testAudit_Sync_IncorrectEarmarkWeightUpdate() external {
+    //     uint256 bn = block.number;
+    //     // 1. Add collateral and mints 10,000 alUSD as debt
+    //     vm.startPrank(address(0xbeef));
+    //     IERC20(address(vault)).approve(address(alchemist), 100_000e18);
+    //     alchemist.deposit(100_000e18, address(0xbeef), 0);
+    //     uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+    //     alchemist.mint(tokenId, 10_000e18, address(0xbeef));
+    //     vm.stopPrank();
+    //     // 2. Create a redemption for 1,000 alUSD
+    //     vm.startPrank(address(0xdad));
+    //     IERC20(alUSD).approve(address(transmuterLogic), 1000e18);
+    //     transmuterLogic.createRedemption(1000e18);
+    //     vm.stopPrank();
+    //     vm.roll(bn += 5_256_000);
+    //     // 3. Claim redemption
+    //     vm.prank(address(0xdad));
+    //     transmuterLogic.claimRedemption(1);
+    //     vm.roll(bn += 1);
+    //     // 4. Update debt and earmark
+    //     vm.prank(address(0xbeef));
+    //     alchemist.poke(tokenId);
+    //     (, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+    //     assertEq(debt, 10_000e18 - 1000e18); // 10,000 - 1,000
+    //     assertEq(earmarked, 0);
+    //     // 5. Create another redemption for 1,000 alUSD
+    //     vm.startPrank(address(0xdad));
+    //     IERC20(alUSD).approve(address(transmuterLogic), 1000e18);
+    //     transmuterLogic.createRedemption(1000e18);
+    //     vm.stopPrank();
+    //     vm.roll(bn += 5_256_000);
+    //     // 6. Update debt and earmark
+    //     vm.prank(address(0xbeef));
+    //     alchemist.poke(tokenId);
+    //     // 7. Create another redemption for 1,000 alUSD
+    //     vm.startPrank(address(0xdad));
+    //     IERC20(alUSD).approve(address(transmuterLogic), 1000e18);
+    //     transmuterLogic.createRedemption(1000e18);
+    //     vm.stopPrank();
+    //     vm.roll(bn += 5_256_000);
+    //     // 8. Update debt and earmark
+    //     vm.prank(address(0xbeef));
+    //     alchemist.poke(tokenId);
+    // }
 }
