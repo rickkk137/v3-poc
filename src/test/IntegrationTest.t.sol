@@ -569,8 +569,8 @@ contract IntegrationTest is Test {
 
         (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
 
-        // 10% remaining since 90% was borrowed against initially
-        assertApproxEqAbs(collateral, 100_000e18 - alchemist.convertDebtTokensToYield(debtAmount * 1000 / 10_000), 1);
+        // 9% remaining since 90% was borrowed against initially + fee
+        assertApproxEqAbs(collateral, 100_000e18 - alchemist.convertDebtTokensToYield(debtAmount) - (alchemist.convertDebtTokensToYield(debtAmount) * 100 / 10_000), 1);
 
         // Only remaining debt should be from the fees paid on debt
         assertApproxEqAbs(debt, 0, 1);

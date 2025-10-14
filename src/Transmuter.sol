@@ -217,7 +217,7 @@ contract Transmuter is ITransmuter, ERC721Enumerable {
         uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(alchemist.myt(), address(this));
         // Avoid divide by 0
         uint256 denominator = alchemist.getTotalUnderlyingValue() + alchemist.convertYieldTokensToUnderlying(yieldTokenBalance) > 0 ? alchemist.getTotalUnderlyingValue() + alchemist.convertYieldTokensToUnderlying(yieldTokenBalance) : 1;
-        uint256 badDebtRatio = alchemist.totalSyntheticsIssued() * 10**TokenUtils.expectDecimals(alchemist.myt()) / denominator;
+        uint256 badDebtRatio = alchemist.totalSyntheticsIssued() * 10**TokenUtils.expectDecimals(alchemist.underlyingToken()) / denominator;
 
         uint256 scaledTransmuted = amountTransmuted;
 

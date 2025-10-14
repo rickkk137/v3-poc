@@ -73,6 +73,10 @@ contract MockAlchemist {
         return address(myt);
     }
 
+    function underlyingToken() external view returns (address) {
+        return address(myt);
+    }
+
     function getTotalUnderlyingValue() external view returns (uint256) {
         if (underlyingValue > 0) {
             return underlyingValue;
