@@ -3695,8 +3695,6 @@ contract AlchemistV3Test is Test {
         // claimRedemption() success //
         ///////////////////////////////
         vm.startPrank(anotherExternalUser);
-        // [FAIL: panic: arithmetic underflow or overflow (0x11)]
-        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11));
         transmuterLogic.claimRedemption(1);
         vm.stopPrank();
     }
